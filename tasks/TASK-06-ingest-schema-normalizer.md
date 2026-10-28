@@ -1,6 +1,6 @@
 # TASK-06: Автоопределение 6 схем, честный `level` и `clock_skew_ms` (`./services/ingest-service/internal/normalizer`)
 
-- **Статус:** `TODO`
+- **Статус:** `READY_FOR_REVIEW`
 - **Зависимости:** `TASK-05`
 - **Область видимости (Scope):**
   - Читать: `./pkg/contracts/`
@@ -93,15 +93,39 @@ py ./verify_task.py TASK-06
 
 ## Отчёт о выполнении (заполняется субагентом-воркером)
 
-- **Дата выполнения:** *(не заполнено)*
-- **Созданные/изменённые файлы:** *(не заполнено)*
-- **Результаты проверок и тестов:** *(не заполнено)*
-- **Заметки по реализации:** *(не заполнено)*
+- **Дата выполнения:** 2026-10-28 19:32 UTC
+- **Соблюдение цикла TDD (Contract → Tests → Code):**
+  1. **Contract Phase:** В `normalizer.go` объявлена сигнатура функции `NormalizeRecord(caseID string, rec contracts.RawScriptRecord, sourceFile string, recordIdx uint32) (contracts.NormalizedEvent, map[string]any)` и импортирован пакет `contracts`.
+  2. **RED Phase (Tests First):** Написан полный набор тестов в `normalizer_test.go` (10 групп тестов, включая оба реальных кейса `chat-session` OPTIONS 204 с переопределением ложного `detected_level="error"` в `LevelInfo` и `chat-com` с вычислением `ClockSkewMs` ~ +7200000 мс; все 6 схем; замена UUID и чисел в `HTTPRoute` на `<id>`; очистка ключей от пробелов и двоеточий; fallbacks и edge cases). Тесты скомпилировались и упали (RED).
+  3. **GREEN Phase (Implementation):** Реализован полный честный алгоритм в `normalizer.go` без заглушек и без `// TODO`.
+  4. **Coverage & Verification Gate:** Достигнуто покрытие 89.4% (порог >= 80%), верификатор `py ./verify_task.py TASK-06` успешно завершился со статусом `[VERIFY PASSED]`.
+- **Созданные/изменённые файлы:**
+  - `services/ingest-service/internal/normalizer/normalizer.go` (349 строк)
+  - `services/ingest-service/internal/normalizer/normalizer_test.go` (619 строк)
+- **Результаты проверок и тестов:**
+  - `go test -v -cover ./internal/normalizer/...`: `PASS`, покрытие `89.4% of statements` (требовалось `>= 80.0%`).
+  - `py ./verify_task.py TASK-06`: `[VERIFY PASSED] TASK-06 passed all automated checks!`.
+- **Заметки по реализации:**
+  - Логика исправления бага Loki честно анализирует схему `SchemaEchoAccess`: статус < 400 и пустая строка ошибки безусловно определяют уровень `LevelInfo`, полностью игнорируя ложный `detected_level="error"` от Loki.
+  - Определение `ClockSkewMs` поддерживает форматы RFC3339Nano, RFC3339, `060102 15:04:05 -0700` и рассчитывает сдвиг часов `(appTime.UnixNano() - ev.Ts.UnixNano()) / 1_000_000`.
+  - Нормализация `HTTPRoute` распознает и очищает сегменты URL с UUID (включая 32-hex и 36-char c дефисами) и десятичными числами, заменяя их на `<id>`, очищая параметры запросов и фрагменты.
+  - Очистка ключей в `cleanJSONMap` удаляет двоеточия и пробелы по краям, заменяет внутренние пробелы на `_` и сохраняет оригинальные ключи для обратной совместимости.
 
 ---
 
 ## Вердикт ревьюера (заполняется субагентом-ревьюером)
 
-- **Статус ревью:** `PENDING` *(выбрать: `APPROVED` | `CHANGES_REQUESTED`)*
-- **Проверенные контракты и тесты:** *(не заполнено)*
-- **Найденные замечания (если есть):** *(не заполнено)*
+- **Статус ревью:** `APPROVED`
+- **Проверенные контракты и тесты (TDD Coverage):**
+  - Проверена реализация в `services/ingest-service/internal/normalizer/normalizer.go` и тесты в `services/ingest-service/internal/normalizer/normalizer_test.go`.
+  - Все контракты пакета `pkg/contracts` соблюдены посимвольно (`RawScriptRecord`, `NormalizedEvent`, константы `Level*`, `Severity*`, `Schema*`).
+  - Покрытие тестами: `coverage: 89.4% of statements` (порог >= 80.0% успешно превзойдён).
+  - Верификатор `py ./verify_task.py TASK-06` успешно пройден (`[VERIFY PASSED] TASK-06 passed all automated checks!`).
+  - Проверены реальные кейсы:
+    1. `chat-session` (OPTIONS 204 с `"error":""`): ложный `detected_level="error"` от Loki честно переопределяется в `contracts.LevelInfo` и `SeverityInfo`.
+    2. `chat-com` (`time: "260930 08:47:50 +0000"`): корректно вычисляется сдвиг часов `ClockSkewMs` (+7200000 мс / +2 часа).
+    3. Все 6 схем (`go_slog`, `py_tornado`, `echo_access`, `otel_http`, `generic_json`, `plain`) корректно классифицируются и парсятся.
+    4. Нормализация `HTTPRoute` заменяет UUID и числа на `<id>`, очищает query-параметры и якоря.
+    5. Очистка ключей от двоеточий/пробелов с сохранением оригинальных ключей работает штатно.
+  - Заглушек (`TODO`, `FIXME`, `panic`) нет.
+- **Найденные замечания (если есть):** Замечаний нет. Решение полностью готово к интеграции.
