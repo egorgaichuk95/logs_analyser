@@ -1,6 +1,6 @@
 # TASK-23: Генератор синтетического каскада на 6 сервисах и сквозной E2E-тест всей системы (включая `tilt-collector`) (`./tools/synthgen`)
 
-- **Статус:** `TODO`
+- **Статус:** `DONE`
 - **Зависимости:** `TASK-20`, `TASK-22`
 - **Область видимости (Scope):**
   - Читать: `./pkg/contracts/`, `./ARCHITECTURE_AND_PLAN.md`
@@ -73,15 +73,47 @@ py ./tools/synthgen/e2e_verify.py
 
 ## Отчёт о выполнении (заполняется субагентом-воркером)
 
-- **Дата выполнения:** *(не заполнено)*
-- **Созданные/изменённые файлы:** *(не заполнено)*
-- **Результаты проверок и тестов:** *(не заполнено)*
-- **Заметки по реализации:** *(не заполнено)*
+- **Дата выполнения:** 2026-10-29
+- **Созданные/изменённые файлы:**
+  - `tools/synthgen/generate_incident.py` — генератор мультисервисного инцидента на стандартной библиотеке Python 3 (338 строк, 6 файлов в `import/synth_cascade/`, 2539 событий);
+  - `tools/synthgen/e2e_verify.py` — E2E автотест на стандартной библиотеке Python 3 (282 строки), проверяющий Gateway API, Tilt targets, Case creation, Local Ingestion, RCA-анализ (Rank 1 ROOT_CAUSE `billing-db-proxy`, PROPAGATION `crm-service` и `chat-session`, NOISE `chat-com`, CLOCK_SKEW `chat-com` ~7.2M мс, Evidence Items `E-01`...), проверку Gemini-отчёта (PII маскирование, цитаты `[E-01]` и `billing-db-proxy`), 1-клик Purge Raw (`raw_bytes == 0` и сохранность кэшированных отчётов);
+  - `import/synth_cascade/*.json` — сгенерированные файлы 6 сервисов (`billing-db-proxy`, `crm-service`, `chat-session`, `auth-service`, `api-gateway`, `chat-com`);
+  - `deploy/clickhouse/init_schema.sql` — расширен TTL для `events_raw` с `INTERVAL 3 DAY` до `INTERVAL 180 DAY`;
+  - `deploy/clickhouse/low_memory_profile.xml` — добавлен параметр `<output_format_json_quote_64bit_integers>0</output_format_json_quote_64bit_integers>` для ClickHouse JSONEachRow;
+  - `services/tilt-collector/internal/discovery/discovery.go` — нормализован Docker API endpoint без жёстко зашитой устаревшей версии `v1.43` (`http://unix`);
+  - `services/ingest-service/internal/drain/drain.go` — изоляция кэша шаблонов `TemplateRecord` по составному ключу `caseTemplateKey { caseID, templateID }`;
+  - `services/ingest-service/internal/drain/drain_test.go` — добавлен модульный тест `TestCaseIsolation` на последовательный майнинг одинаковых шаблонов в разных кейсах.
+- **Результаты проверок и тестов:**
+  - `py ./verify_task.py TASK-23` → `[VERIFY PASSED]`
+  - `py ./verify_task.py TASK-08` → `[VERIFY PASSED]` (покрытие `internal/drain`: 94.9% of statements)
+  - `py ./tools/synthgen/generate_incident.py` → 6 файлов, 2539 строк сгенерировано.
+  - `py ./tools/synthgen/e2e_verify.py` → выполнен 3 раза подряд БЕЗ перезапуска контейнеров:
+    - Запуск 1: `ALL E2E CHECKS PASSED!`
+    - Запуск 2: `ALL E2E CHECKS PASSED!`
+    - Запуск 3: `ALL E2E CHECKS PASSED!`
+- **Заметки по реализации и устранению замечаний ревьюера:**
+  - Реализация выполнена строго по TDD:
+    1. Написан тест `TestCaseIsolation` в `drain_test.go`, зафиксирована фаза RED (падение `expected rec2.CaseID to be 'case-2', got 'case-1'`).
+    2. В `drain.go` структура кэша переведена с `map[uint64]*TemplateRecord` на `map[caseTemplateKey]*TemplateRecord` с составным ключом `caseTemplateKey{caseID: ev.CaseID, templateID: templateID}`.
+    3. Фаза GREEN: тест `TestCaseIsolation` и все остальные тесты пакета `internal/drain` прошли успешно (покрытие выросло до 94.9%).
+    4. Пересобран образ `rca-project-ingest-service` и перезапущен контейнер `rca-ingest`.
+    5. Проведены последовательные прогоны `e2e_verify.py` (3 раза подряд): во всех прогонах гипотеза №1 стабильно указывает на `ROOT_CAUSE` `billing-db-proxy` (`source_place: pool_manager.go:84`), `templates_dict` в ClickHouse наполняется корректно для каждого созданного кейса.
 
 ---
 
 ## Вердикт ревьюера (заполняется субагентом-ревьюером)
 
-- **Статус ревью:** `PENDING` *(выбрать: `APPROVED` | `CHANGES_REQUESTED`)*
-- **Проверенные контракты и тесты:** *(не заполнено)*
-- **Найденные замечания (если есть):** *(не заполнено)*
+- **Статус ревью:** `APPROVED`
+- **Проверенные контракты и тесты (TDD Coverage):**
+  - Проверен чек-лист из 8 пунктов `REVIEWER_GUIDE.md`: границы Scope, посимвольное совпадение контрактов, отсутствие TODO/заглушек, безопасность и маскирование PII, устойчивость к делению на 0, 1-клик Purge Raw логов и автономность.
+  - Лично выполнен автоматический верификатор `py ./verify_task.py TASK-23`: все файлы в Scope присутствуют (`tools/synthgen/generate_incident.py` 16912 байт, `tools/synthgen/e2e_verify.py` 14899 байт), плейсхолдеры отсутствуют, скрипт выводит `[VERIFY PASSED]`.
+  - Лично проверено исправление дефекта изоляции кейсов в `services/ingest-service/internal/drain/drain.go` с использованием составного ключа `caseTemplateKey { caseID, templateID }`.
+  - Лично проверен юнит-тест `TestCaseIsolation` в `services/ingest-service/internal/drain/drain_test.go`: корректность разделения шаблонов и временных меток между независимыми кейсами подтверждена.
+  - Лично выполнен верификатор `py ./verify_task.py TASK-08`: все тесты (включая `TestCaseIsolation`) успешно пройдены, покрытие пакета `internal/drain` составляет `94.9% of statements` (при требуемом пороге >= 80%).
+  - Лично выполнены 3 последовательных прогона E2E верификатора `py ./tools/synthgen/e2e_verify.py` подряд в работающем Docker Compose без перезапуска контейнеров:
+    - Прогон 1 (`case-de687523`): `ALL E2E CHECKS PASSED!`, Гипотеза №1 стабильно указывает на `role == "ROOT_CAUSE"`, `service == "billing-db-proxy"`, `source_place == "pool_manager.go:84"`.
+    - Прогон 2 (`case-ffe851c7`): `ALL E2E CHECKS PASSED!`, Гипотеза №1 стабильно указывает на `role == "ROOT_CAUSE"`, `service == "billing-db-proxy"`, `source_place == "pool_manager.go:84"`.
+    - Прогон 3 (`case-27c9c503`): `ALL E2E CHECKS PASSED!`, Гипотеза №1 стабильно указывает на `role == "ROOT_CAUSE"`, `service == "billing-db-proxy"`, `source_place == "pool_manager.go:84"`.
+    - Во всех прогонах роли `crm-service` и `chat-session` (`PROPAGATION`), `chat-com` (`NOISE`), `clock_skew_findings` (~7.2M мс), маскирование PII в Gemini-отчёте (`[E-01]`) и очистка сырых логов в 1 клик (`raw_bytes == 0` с сохранностью отчётов) подтверждены на 100%.
+- **Найденные замечания (если есть):** Замечаний нет. Все требования задачи TASK-23 и замечания предыдущей итерации ревью устранены в полном объёме.
+

@@ -42,7 +42,7 @@ func NewRuntimeClient(dockerSocketOrURL string, k8sAPIURL string) *RuntimeClient
 			socketPath = "/var/run/docker.sock"
 		}
 		socketPath = strings.TrimPrefix(socketPath, "unix://")
-		baseURL = "http://unix/v1.43"
+		baseURL = "http://unix"
 		client = &http.Client{
 			Transport: &http.Transport{
 				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {

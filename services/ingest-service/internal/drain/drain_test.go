@@ -481,3 +481,54 @@ func TestEdgeCases(t *testing.T) {
 		}
 	})
 }
+
+// TestCaseIsolation проверяет изоляцию шаблонов по CaseID:
+// при последовательном майнинге одинаковых сообщений из разных кейсов (case-1 и case-2)
+// возвращаемые TemplateRecord должны содержать соответствующий CaseID каждого кейса,
+// предотвращая кросс-кейсовую утечку шаблонов.
+func TestCaseIsolation(t *testing.T) {
+	miner := drain.NewMiner()
+
+	t1 := time.Date(2026, 10, 28, 10, 0, 0, 0, time.UTC)
+	t2 := time.Date(2026, 10, 28, 11, 0, 0, 0, time.UTC)
+
+	ev1 := &contracts.NormalizedEvent{
+		CaseID:      "case-1",
+		Service:     "billing-db-proxy",
+		Level:       contracts.LevelError,
+		SourcePlace: "pool_manager.go:84",
+		Message:     "HikariPool-1 - Connection is not available, request timed out",
+		ErrorClass:  "RESOURCE",
+		Ts:          t1,
+	}
+
+	ev2 := &contracts.NormalizedEvent{
+		CaseID:      "case-2",
+		Service:     "billing-db-proxy",
+		Level:       contracts.LevelError,
+		SourcePlace: "pool_manager.go:84",
+		Message:     "HikariPool-1 - Connection is not available, request timed out",
+		ErrorClass:  "RESOURCE",
+		Ts:          t2,
+	}
+
+	rec1 := miner.Mine(ev1)
+	rec2 := miner.Mine(ev2)
+
+	if rec1.CaseID != "case-1" {
+		t.Fatalf("expected rec1.CaseID to be 'case-1', got %q", rec1.CaseID)
+	}
+	if rec2.CaseID != "case-2" {
+		t.Fatalf("expected rec2.CaseID to be 'case-2', got %q", rec2.CaseID)
+	}
+	if rec1.TemplateID != rec2.TemplateID {
+		t.Fatalf("expected identical template IDs across cases, got %d and %d", rec1.TemplateID, rec2.TemplateID)
+	}
+	if rec1.FirstSeen != t1 || rec1.LastSeen != t1 {
+		t.Fatalf("rec1 timestamps corrupted: first=%v, last=%v", rec1.FirstSeen, rec1.LastSeen)
+	}
+	if rec2.FirstSeen != t2 || rec2.LastSeen != t2 {
+		t.Fatalf("rec2 timestamps corrupted: first=%v, last=%v", rec2.FirstSeen, rec2.LastSeen)
+	}
+}
+

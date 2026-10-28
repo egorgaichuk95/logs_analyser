@@ -50,18 +50,23 @@ func newNode() *Node {
 	}
 }
 
+type caseTemplateKey struct {
+	caseID     string
+	templateID uint64
+}
+
 type Miner struct {
 	mu        sync.Mutex
 	cache     map[string]*LogCluster
 	root      *Node
-	templates map[uint64]*contracts.TemplateRecord
+	templates map[caseTemplateKey]*contracts.TemplateRecord
 }
 
 func NewMiner() *Miner {
 	return &Miner{
 		cache:     make(map[string]*LogCluster),
 		root:      newNode(),
-		templates: make(map[uint64]*contracts.TemplateRecord),
+		templates: make(map[caseTemplateKey]*contracts.TemplateRecord),
 	}
 }
 
@@ -270,7 +275,12 @@ func (m *Miner) Mine(ev *contracts.NormalizedEvent) contracts.TemplateRecord {
 		ts = time.Now()
 	}
 
-	rec, exists := m.templates[templateID]
+	key := caseTemplateKey{
+		caseID:     ev.CaseID,
+		templateID: templateID,
+	}
+
+	rec, exists := m.templates[key]
 	if !exists {
 		newRec := contracts.TemplateRecord{
 			CaseID:         ev.CaseID,
@@ -284,7 +294,7 @@ func (m *Miner) Mine(ev *contracts.NormalizedEvent) contracts.TemplateRecord {
 			FirstSeen:      ts,
 			LastSeen:       ts,
 		}
-		m.templates[templateID] = &newRec
+		m.templates[key] = &newRec
 		return newRec
 	}
 

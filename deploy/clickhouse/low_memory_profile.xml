@@ -6,6 +6,7 @@
             <max_insert_threads>1</max_insert_threads>
             <max_block_size>8192</max_block_size>
             <async_insert>0</async_insert>
+            <output_format_json_quote_64bit_integers>0</output_format_json_quote_64bit_integers>
         </default>
     </profiles>
 </clickhouse>
