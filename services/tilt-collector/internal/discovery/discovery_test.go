@@ -787,3 +787,93 @@ func TestDiscoverTargets_K8sEdgeCases(t *testing.T) {
 	}
 }
 
+func TestStreamContainerLogs_Docker(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/containers/c123/logs") {
+			w.Header().Set("Content-Type", "text/plain")
+			_, _ = w.Write([]byte("2026-09-30T08:20:00.100Z log message 1\n2026-09-30T08:20:00.200Z log message 2\n"))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer ts.Close()
+
+	client := NewRuntimeClient(ts.URL, "")
+	target := contracts.TiltTarget{
+		ID:          "c123",
+		Runtime:     contracts.RuntimeDocker,
+		ServiceName: "chat-com",
+		PodName:     "chat-com-pod",
+	}
+
+	var records []contracts.RawScriptRecord
+	err := client.StreamContainerLogs(context.Background(), target, 10, func(rec contracts.RawScriptRecord) {
+		records = append(records, rec)
+	})
+	if err != nil {
+		t.Fatalf("StreamContainerLogs failed: %v", err)
+	}
+	if len(records) != 2 {
+		t.Fatalf("expected 2 records, got %d", len(records))
+	}
+	if records[0].Line != "log message 1" || records[1].Line != "log message 2" {
+		t.Errorf("unexpected lines: %+v", records)
+	}
+}
+
+func TestStreamContainerLogs_K8s(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/api/v1/namespaces/default/pods/pod-1/log") {
+			w.Header().Set("Content-Type", "text/plain")
+			_, _ = w.Write([]byte("2026-09-30T08:20:00.300Z stdout F k8s log line\n"))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer ts.Close()
+
+	client := NewRuntimeClient("", ts.URL)
+	target := contracts.TiltTarget{
+		ID:          "pod-1",
+		Runtime:     contracts.RuntimeK8s,
+		ServiceName: "k8s-service",
+		PodName:     "pod-1",
+		Namespace:   "default",
+	}
+
+	var records []contracts.RawScriptRecord
+	err := client.StreamContainerLogs(context.Background(), target, 60, func(rec contracts.RawScriptRecord) {
+		records = append(records, rec)
+	})
+	if err != nil {
+		t.Fatalf("StreamContainerLogs K8s failed: %v", err)
+	}
+	if len(records) != 1 || records[0].Line != "k8s log line" {
+		t.Errorf("unexpected records: %+v", records)
+	}
+}
+
+func TestOpenContainerLogs_Errors(t *testing.T) {
+	var nilClient *RuntimeClient
+	target := contracts.TiltTarget{ID: "c1"}
+	if _, err := nilClient.OpenContainerLogs(context.Background(), target, 0); err == nil {
+		t.Errorf("expected error on nil client")
+	}
+
+	ts500 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "server error", http.StatusInternalServerError)
+	}))
+	defer ts500.Close()
+
+	client500 := NewRuntimeClient(ts500.URL, ts500.URL)
+	if _, err := client500.OpenContainerLogs(context.Background(), target, 0); err == nil {
+		t.Errorf("expected error on docker 500 response")
+	}
+
+	k8sTarget := contracts.TiltTarget{Runtime: contracts.RuntimeK8s, PodName: "p1", Namespace: "n1"}
+	if _, err := client500.OpenContainerLogs(context.Background(), k8sTarget, 0); err == nil {
+		t.Errorf("expected error on k8s 500 response")
+	}
+}
+
+

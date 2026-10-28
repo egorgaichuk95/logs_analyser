@@ -45,9 +45,12 @@ func NewRuntimeClient(dockerSocketOrURL string, k8sAPIURL string) *RuntimeClient
 		baseURL = "http://unix/v1.43"
 		client = &http.Client{
 			Transport: &http.Transport{
-				DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 					var d net.Dialer
-					return d.DialContext(ctx, "unix", socketPath)
+					if strings.HasPrefix(addr, "unix:") {
+						return d.DialContext(ctx, "unix", socketPath)
+					}
+					return d.DialContext(ctx, network, addr)
 				},
 			},
 			Timeout: 30 * time.Second,
@@ -455,3 +458,68 @@ func (c *RuntimeClient) discoverK8sPods(ctx context.Context) ([]contracts.TiltTa
 
 	return targets, nil
 }
+
+// OpenContainerLogs открывает поток логов контейнера (Docker или K8s).
+func (c *RuntimeClient) OpenContainerLogs(ctx context.Context, target contracts.TiltTarget, sinceSeconds int) (io.ReadCloser, error) {
+	if c == nil || c.httpClient == nil {
+		return nil, errors.New("runtime client is not initialized")
+	}
+
+	if target.Runtime == contracts.RuntimeK8s && c.k8sAPIURL != "" {
+		url := fmt.Sprintf("%s/api/v1/namespaces/%s/pods/%s/log?follow=true&timestamps=true",
+			strings.TrimRight(c.k8sAPIURL, "/"),
+			target.Namespace,
+			target.PodName,
+		)
+		if sinceSeconds > 0 {
+			url = fmt.Sprintf("%s&sinceSeconds=%d", url, sinceSeconds)
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, fmt.Errorf("create k8s pod logs request: %w", err)
+		}
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("k8s pod logs request failed: %w", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			return nil, fmt.Errorf("k8s API returned status %d", resp.StatusCode)
+		}
+		return resp.Body, nil
+	}
+
+	url := fmt.Sprintf("%s/containers/%s/logs?follow=1&stdout=1&stderr=1&timestamps=1",
+		strings.TrimRight(c.dockerBaseURL, "/"),
+		target.ID,
+	)
+	if sinceSeconds > 0 {
+		url = fmt.Sprintf("%s&since=%d", url, sinceSeconds)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create docker logs request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("docker logs request failed: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return nil, fmt.Errorf("docker API returned status %d", resp.StatusCode)
+	}
+
+	return resp.Body, nil
+}
+
+// StreamContainerLogs открывает поток логов контейнера и парсит записи через StreamReader.
+func (c *RuntimeClient) StreamContainerLogs(ctx context.Context, target contracts.TiltTarget, sinceSeconds int, onRecord func(contracts.RawScriptRecord)) error {
+	stream, err := c.OpenContainerLogs(ctx, target, sinceSeconds)
+	if err != nil {
+		return err
+	}
+	defer stream.Close()
+	return StreamReader(ctx, stream, target, onRecord)
+}
+
