@@ -5,8 +5,8 @@
   "min_test_coverage_percent": 80,
   "target_model": "gemini-3.8-flash-high",
   "subagent_model_mode": "inherit",
-  "current_task_id": "TASK-17",
-  "current_task_file": "./tasks/TASK-17-evidence-reports-gemini-and-zip.md",
+  "current_task_id": "TASK-18",
+  "current_task_file": "./tasks/TASK-18-tilt-discovery-and-log-stream.md",
   "current_phase": "IDLE",
   "attempt_in_current_task": 0,
   "max_attempts_per_task": 3,
@@ -28,10 +28,10 @@
     "TASK-13",
     "TASK-14",
     "TASK-15",
-    "TASK-16"
+    "TASK-16",
+    "TASK-17"
   ],
   "pending_tasks_ordered": [
-    "TASK-17",
     "TASK-18",
     "TASK-19",
     "TASK-20",

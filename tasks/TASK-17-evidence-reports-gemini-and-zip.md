@@ -96,15 +96,44 @@ py ./verify_task.py TASK-17
 
 ## Отчёт о выполнении (заполняется субагентом-воркером)
 
-- **Дата выполнения:** *(не заполнено)*
-- **Созданные/изменённые файлы:** *(не заполнено)*
-- **Результаты проверок и тестов:** *(не заполнено)*
-- **Заметки по реализации:** *(не заполнено)*
+- **Дата выполнения:** 2026-10-28
+- **Созданные/изменённые файлы:**
+  - `services/evidence-service/internal/reporter/pii.go` — детерминированный маскировщик PII (`RedactPII`) для email, display_name, публичных IP, JWT токенов с сохранением приватных подсетей (10.x, 172.16-31.x, 192.168.x, 127.x) и DNS k8s;
+  - `services/evidence-service/internal/reporter/builder.go` — генератор 7 артефактов (`timeline.svg`, `topology.svg`, `evidence.jsonl`, `report.md`, `report.html`, `gemini_bundle.md`, `evidence_<case_id>.zip` с `manifest.json`);
+  - `services/evidence-service/internal/reporter/builder_test.go` — исчерпывающие тесты TDD: маскирование PII, генерация 7 файлов, валидация manifest.json и sha256 внутри zip, системный промпт Gemini и жесткое ограничение размера bundle <= 320 КБ;
+  - `services/evidence-service/internal/server/http.go` — HTTP сервер (`GET /health`, `POST /internal/evidence/build`) с интеграцией ClickHouse fallback через `collector.CollectEvidence`;
+  - `services/evidence-service/internal/server/http_test.go` — тесты HTTP API: healthcheck, сборка доказательств, обработка некорректных запросов и fallback;
+  - `services/evidence-service/cmd/evidence/main.go` — точка входа микросервиса с graceful shutdown;
+  - `services/evidence-service/Dockerfile` — многоэтапная сборка Docker-образа `evidence-service`.
+- **Результаты проверок и тестов:**
+  - `go test -v -cover ./internal/...`:
+    * `github.com/local/logs-analyzer/services/evidence-service/internal/collector`: `coverage: 87.3% of statements` (PASS)
+    * `github.com/local/logs-analyzer/services/evidence-service/internal/reporter`: `coverage: 89.5% of statements` (PASS)
+    * `github.com/local/logs-analyzer/services/evidence-service/internal/server`: `coverage: 93.1% of statements` (PASS)
+    * `github.com/local/logs-analyzer/services/evidence-service/internal/svgchart`: `coverage: 92.7% of statements` (PASS)
+  - `docker compose build evidence-service`: успешно собран образ `rca-project-evidence-service:latest`.
+  - `py ./verify_task.py TASK-17`: `[VERIFY PASSED] TASK-17 passed all automated checks!`.
+- **Заметки по реализации:**
+  - Системный промпт для Google Gemini встроен посимвольно в соответствии со спецификацией Blueprint.
+  - Лимит размера `gemini_bundle.md` (<= 320 КБ) соблюдается благодаря динамическому контролю объема при включении доказательств.
+  - Контрольные суммы SHA-256 вычисляются для всех 6 отчётных файлов и упаковываются в `manifest.json` внутри архива `evidence_<case_id>.zip`.
+  - Заглушки, `TODO`, `FIXME` и нереализованный код отсутствуют.
 
 ---
 
 ## Вердикт ревьюера (заполняется субагентом-ревьюером)
 
-- **Статус ревью:** `PENDING` *(выбрать: `APPROVED` | `CHANGES_REQUESTED`)*
-- **Проверенные контракты и тесты:** *(не заполнено)*
-- **Найденные замечания (если есть):** *(не заполнено)*
+- **Статус ревью:** `APPROVED`
+- **Проверенные контракты и тесты (TDD Coverage):**
+  - Все контракты (`BuildEvidenceRequest`, `BuildEvidenceResponse`, `EvidenceItem`, HTTP API `POST /internal/evidence/build`, `GET /health`) посимвольно проверены на соответствие `./pkg/contracts/` и Blueprint задачи.
+  - Посимвольно сверен системный промпт Google Gemini в `builder.go` и `gemini_bundle.md`.
+  - Проверено детерминированное маскирование PII (`RedactPII`) в `pii.go`: email (`<EMAIL_...>`), display_name (`<USER_...>`), публичные IP (`<CLIENT_IP_...>`), JWT (`<TOKEN_...>`) с сохранением подсетей k8s `10.x`, `172.16-31.x`, `192.168.x`, `127.x` и DNS `*.svc.cluster.local`.
+  - Проверена генерация всех 7 артефактов (`timeline.svg`, `topology.svg`, `evidence.jsonl`, `report.md`, `report.html`, `gemini_bundle.md`, `evidence_<case_id>.zip`) и `manifest.json` с SHA-256 контрольными суммами внутри zip-архива.
+  - Проверено ограничение размера `gemini_bundle.md` $\le 320\text{ КБ}$.
+  - Лично выполнен автоматический верификатор `py ./verify_task.py TASK-17` — все проверки успешно пройдены (`[VERIFY PASSED]`), Docker-образ `evidence-service` успешно собран.
+  - Покрытие тестами:
+    * `services/evidence-service/internal/server`: `93.1% of statements` (порог: 75.0%)
+    * `services/evidence-service/internal/svgchart`: `92.7% of statements` (порог: 75.0%)
+    * `services/evidence-service/internal/reporter`: `89.5% of statements` (порог: 75.0%)
+    * `services/evidence-service/internal/collector`: `87.3% of statements` (порог: 75.0%)
+- **Найденные замечания (если есть):** Замечаний нет. Реализация выполнена в строгом соответствии с контрактами, TDD-методологией, требованиями безопасности и ресурсными ограничениями.
