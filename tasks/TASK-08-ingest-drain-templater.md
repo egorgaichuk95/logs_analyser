@@ -1,6 +1,6 @@
 # TASK-08: Быстрый шаблонизатор сообщений Drain с хэш-кэшем (`./services/ingest-service/internal/drain`)
 
-- **Статус:** `TODO`
+- **Статус:** `DONE`
 - **Зависимости:** `TASK-07`
 - **Область видимости (Scope):**
   - Читать: `./pkg/contracts/`
@@ -72,15 +72,33 @@ py ./verify_task.py TASK-08
 
 ## Отчёт о выполнении (заполняется субагентом-воркером)
 
-- **Дата выполнения:** *(не заполнено)*
-- **Созданные/изменённые файлы:** *(не заполнено)*
-- **Результаты проверок и тестов:** *(не заполнено)*
-- **Заметки по реализации:** *(не заполнено)*
+- **Дата выполнения:** 2026-10-28 20:02 UTC
+- **Соблюдение цикла TDD (Contract -> Tests -> Code):**
+  1. CONTRACT: Создана структура `Miner`, конструктор `NewMiner() *Miner` и метод `Mine(ev *contracts.NormalizedEvent) contracts.TemplateRecord` по Blueprint.
+  2. RED: Написаны полные тесты в `drain_test.go` (Blueprint кейсы chat-com `operator_id=<num>` и Session `id=<hex>`, правила preMask, дерево Drain глубиной 4 с порогом 0.6 и лимитом 100 детей, O(1) хэш-кэш, параллельные вызовы из 30 горутин, граничные случаи). Первичный запуск тестов подтвердил падение (RED).
+  3. GREEN: Полностью реализован модуль `drain.go` без TODO/заглушек: точные 5 правил преднормализации, дерево кластеризации Drain с заменой вариативных токенов на `<*>`, потокобезопасный хэш-кэш и FNV64a хэширование `TemplateID`.
+  4. VERIFY: Пройден гейт `verify_task.py TASK-08`.
+- **Созданные/изменённые файлы:**
+  - `./services/ingest-service/internal/drain/drain.go` (272 строки)
+  - `./services/ingest-service/internal/drain/drain_test.go` (496 строк)
+- **Результаты проверок и тестов:**
+  - `go test -v -cover ./internal/drain/...`: `PASS`, покрытие `94.1% of statements` (порог `>= 80%`).
+  - `py ./verify_task.py TASK-08`: `[VERIFY PASSED] TASK-08 passed all automated checks!`.
+- **Заметки по реализации:**
+  - `preMask` выполняет в точном порядке замену query-параметров (`?<query>`), UUID (`<uuid>`), hex-идентификаторов 20..64 символов и 0x... (`<hex>`), IPv4 с портами (`<ip>`), чисел (`<num>`), а также обрезку до 512 рун с сохранением UTF-8.
+  - Дерево кластеризации Drain использует глубину 4 и лимит 100 детей на узел с fallback на `*`, корректно вычисляет сходство и обновляет токены кластера на `<*>`.
+  - Хэш-кэш гарантирует O(1) для повторяющихся преднормализованных сообщений (типично для `chat-com`).
+  - Метод `Mine` потокобезопасен (`sync.Mutex`), заполняет `ev.TemplateID` и возвращает `contracts.TemplateRecord` с обновлением `FirstSeen` и `LastSeen`.
 
 ---
 
 ## Вердикт ревьюера (заполняется субагентом-ревьюером)
 
-- **Статус ревью:** `PENDING` *(выбрать: `APPROVED` | `CHANGES_REQUESTED`)*
-- **Проверенные контракты и тесты:** *(не заполнено)*
-- **Найденные замечания (если есть):** *(не заполнено)*
+- **Статус ревью:** `APPROVED`
+- **Проверенные контракты и тесты (TDD Coverage):**
+  - Файлы: `./services/ingest-service/internal/drain/drain.go`, `./services/ingest-service/internal/drain/drain_test.go`.
+  - Полнота контрактов: Структура `Miner`, методы `NewMiner()` и `Mine(ev *contracts.NormalizedEvent) contracts.TemplateRecord` точно соответствуют Blueprint и `pkg/contracts`. Реализованы все 5 правил `preMask`, FNV64a хэширование `TemplateID`, ограничение длины шаблона 512 рун (UTF-8 safe), дерево кластеризации Drain глубиной 4 с порогом 0.6 и лимитом 100 детей, O(1) хэш-кэш для повторяющихся сообщений, потокобезопасность `sync.Mutex`.
+  - Результаты тестов: Запуск `go test -v -cover ./internal/drain/...` успешен, утверждены Blueprint кейсы для `chat-com` (`operator_id=<num>`), `chat-session` (`id=<hex>`), subtests preMask (URL query, UUID, 0x/длинный hex, IPv4, num), дерево Drain и слияние в `<*>`, граница сходства < 0.6, ограничение maxChildren, O(1) кэш, параллельное исполнение 30 горутин и граничные кейсы (nil event, truncation, Cyrillic, zero timestamp, RawRedacted fallback).
+  - Покрытие кода: `94.1% of statements` (без кэша `94.9% of statements`, порог `>= 80%`).
+  - `py ./verify_task.py TASK-08`: `[VERIFY PASSED] TASK-08 passed all automated checks!`.
+- **Найденные замечания (если есть):** Нет. Замечаний и заглушек не обнаружено, код полностью готов к интеграции.
