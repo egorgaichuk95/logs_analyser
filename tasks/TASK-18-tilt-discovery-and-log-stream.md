@@ -1,6 +1,6 @@
 # TASK-18: Автообнаружение сервисов и парсер живых потоков логов из локального Tilt / k8s / Docker (`./services/tilt-collector`)
 
-- **Статус:** `TODO`
+- **Статус:** `DONE`
 - **Зависимости:** `TASK-04`
 - **Область видимости (Scope):**
   - Читать: `./pkg/contracts/`
@@ -108,15 +108,38 @@ py ./verify_task.py TASK-18
 
 ## Отчёт о выполнении (заполняется субагентом-воркером)
 
-- **Дата выполнения:** *(не заполнено)*
-- **Созданные/изменённые файлы:** *(не заполнено)*
-- **Результаты проверок и тестов:** *(не заполнено)*
-- **Заметки по реализации:** *(не заполнено)*
+- **Дата выполнения:** 2026-10-28 22:35 UTC
+- **Соблюдение цикла TDD (Contract → Tests → Code):**
+  1. *Contract:* Сформирован контракт `RuntimeClient`, `NewRuntimeClient`, `NormalizeTarget`, `DiscoverTargets`, `ParseLogLine`, `StreamReader` по Blueprint.
+  2. *RED (Tests First):* Написаны исчерпывающие тесты в `discovery_test.go` (18 тестов: нормализация Tilt/K8s/Docker compose меток, фильтрация rca-* и системных неймспейсов, CRI и Docker timestamp форматы, plain-строки, демультиплексирование 8-байтового заголовка Docker logs, мокирование Docker API и K8s API через `httptest.NewServer`, обработка ошибок и отмена контекста). Зафиксировано начальное падение тестов (RED).
+  3. *GREEN (Code):* Реализована 100% рабочая логика в `discovery.go` без TODO, FIXME и заглушек. Потоковый демультиплексор поддерживает как фреймы Docker с 8-байтными заголовками, так и plain/CRI потоки.
+  4. *Coverage & Gate:* Достигнуто покрытие **89.5%** statement coverage (минимальный порог 80.0%). Автоматический верификатор `py ./verify_task.py TASK-18` завершился со статусом `[VERIFY PASSED]`.
+- **Созданные/изменённые файлы:**
+  - `./services/tilt-collector/internal/discovery/discovery.go` (460 строк)
+  - `./services/tilt-collector/internal/discovery/discovery_test.go` (780 строк)
+  - `./tasks/TASK-18-tilt-discovery-and-log-stream.md`
+- **Результаты проверок и тестов:**
+  - `go test -v -cover ./internal/discovery/...`: **PASS** (18/18 тестов passed)
+  - `coverage: 89.5% of statements`
+  - `py ./verify_task.py TASK-18`: `[VERIFY PASSED]`
+- **Заметки по реализации:**
+  - `NormalizeTarget`: фильтрует системные контейнеры (`rca-*`, `kube-system`, `local-path-storage`, `ingress-nginx`, `metallb-system`, `podsandbox`), извлекает канонический `ServiceName` с приоритетом Tilt (`dev.tilt.resource`, `tilt.dev/resource`) -> K8s (`app.kubernetes.io/name`, `app`, `service_name`, `io.kubernetes.container.name`) -> Docker compose -> container name с обрезанием хэшей подов.
+  - `ParseLogLine`: демультиплексирует бинарный заголовок при наличии, парсит RFC3339/RFC3339Nano (fallback на UTC now), корректно извлекает CRI payload с тегами `F`/`P` для `stdout`/`stderr`, формирует `contracts.RawScriptRecord` со стандартными полями (`service_name`, `pod`, `namespace`, `source: tilt`).
+  - `StreamReader`: потоково читает лог контейнера, распознает 8-байтовые заголовки фреймов Docker (`uint32` payload length), а также plain-text потоки с безопасным использованием буфера (без `os.ReadFile`/`io.ReadAll`), корректно обрабатывая context cancellation и EOF.
 
 ---
 
 ## Вердикт ревьюера (заполняется субагентом-ревьюером)
 
-- **Статус ревью:** `PENDING` *(выбрать: `APPROVED` | `CHANGES_REQUESTED`)*
-- **Проверенные контракты и тесты:** *(не заполнено)*
-- **Найденные замечания (если есть):** *(не заполнено)*
+- **Статус ревью:** `APPROVED`
+- **Проверенные контракты и тесты (TDD Coverage):**
+  - Файлы в области видимости:
+    - `services/tilt-collector/internal/discovery/discovery.go` (12 790 байт) — реализация `RuntimeClient`, `NewRuntimeClient`, `NormalizeTarget`, `DiscoverTargets`, `ParseLogLine`, `StreamReader`.
+    - `services/tilt-collector/internal/discovery/discovery_test.go` (24 340 байт) — 18 исчерпывающих TDD-тестов, покрывающих все нормализации Tilt/K8s/Docker compose, демультиплексирование бинарных фреймов Docker (8-byte header `[stream_type, 0, 0, 0, uint32_be]`), парсинг CRI `stdout/stderr` с тегами `F`/`P`, fallback RFC3339/RFC3339Nano, мокирование Docker/K8s API через `httptest.NewServer`, проверку отмены контекста и коротких строк.
+  - Покрытие тестами: `coverage: 89.5% of statements` (порог: 80.0%). Все тесты успешно пройдены (`PASS`).
+  - Верификатор `py ./verify_task.py TASK-18` успешно пройден с кодом 0 (`[VERIFY PASSED] TASK-18 passed all automated checks!`).
+  - Контракты и JSON-теги посимвольно соответствуют чертежу задачи и `pkg/contracts` (`TiltTarget`, `RawScriptRecord`, `RuntimeDocker`, `RuntimeK8s`).
+  - Заглушки, `TODO`, `FIXME` и `panic` отсутствуют.
+  - Чтение потоковое через буферы фиксированного размера (без `os.ReadFile`/`io.ReadAll`).
+  - Фильтрация системных контейнеров (`rca-*`, `kube-system`, `local-path-storage`, `ingress-nginx`, `metallb-system`, `podsandbox`) реализована и протестирована.
+- **Найденные замечания (если есть):** Замечаний нет. Решение полностью готово и удовлетворяет всем 8 пунктам чек-листа.
