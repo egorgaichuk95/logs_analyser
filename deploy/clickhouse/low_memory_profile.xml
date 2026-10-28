@@ -1,0 +1,11 @@
+<clickhouse>
+    <profiles>
+        <default>
+            <max_memory_usage>402653184</max_memory_usage>
+            <max_threads>2</max_threads>
+            <max_insert_threads>1</max_insert_threads>
+            <max_block_size>8192</max_block_size>
+            <async_insert>0</async_insert>
+        </default>
+    </profiles>
+</clickhouse>

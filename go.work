@@ -1,0 +1,10 @@
+go 1.23
+
+use (
+	./pkg/contracts
+	./services/evidence-service
+	./services/gateway-api
+	./services/ingest-service
+	./services/rca-engine
+	./services/tilt-collector
+)

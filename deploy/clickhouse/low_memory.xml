@@ -1,0 +1,14 @@
+<clickhouse>
+    <max_server_memory_usage>805306368</max_server_memory_usage>
+    <mark_cache_size>67108864</mark_cache_size>
+    <uncompressed_cache_size>0</uncompressed_cache_size>
+    <compiled_expression_cache_size>16777216</compiled_expression_cache_size>
+    <mlock_executable>false</mlock_executable>
+    <query_log remove="remove"/>
+    <trace_log remove="remove"/>
+    <text_log remove="remove"/>
+    <metric_log remove="remove"/>
+    <asynchronous_metric_log remove="remove"/>
+    <part_log remove="remove"/>
+    <processors_profile_log remove="remove"/>
+</clickhouse>
