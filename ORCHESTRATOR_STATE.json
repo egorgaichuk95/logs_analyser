@@ -5,8 +5,8 @@
   "min_test_coverage_percent": 80,
   "target_model": "gemini-3.8-flash-high",
   "subagent_model_mode": "inherit",
-  "current_task_id": "TASK-10",
-  "current_task_file": "./tasks/TASK-10-gateway-sqlite-and-storage-purge.md",
+  "current_task_id": "TASK-11",
+  "current_task_file": "./tasks/TASK-11-rca-identity-graph-s1.md",
   "current_phase": "IDLE",
   "attempt_in_current_task": 0,
   "max_attempts_per_task": 3,
@@ -21,10 +21,10 @@
     "TASK-06",
     "TASK-07",
     "TASK-08",
-    "TASK-09"
+    "TASK-09",
+    "TASK-10"
   ],
   "pending_tasks_ordered": [
-    "TASK-10",
     "TASK-11",
     "TASK-12",
     "TASK-13",
