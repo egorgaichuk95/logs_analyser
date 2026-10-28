@@ -5,8 +5,8 @@
   "min_test_coverage_percent": 80,
   "target_model": "gemini-3.8-flash-high",
   "subagent_model_mode": "inherit",
-  "current_task_id": "TASK-07",
-  "current_task_file": "./tasks/TASK-07-ingest-redactor-and-classifier.md",
+  "current_task_id": "TASK-08",
+  "current_task_file": "./tasks/TASK-08-ingest-drain-templater.md",
   "current_phase": "IDLE",
   "attempt_in_current_task": 0,
   "max_attempts_per_task": 3,
@@ -18,10 +18,10 @@
     "TASK-03",
     "TASK-04",
     "TASK-05",
-    "TASK-06"
+    "TASK-06",
+    "TASK-07"
   ],
   "pending_tasks_ordered": [
-    "TASK-07",
     "TASK-08",
     "TASK-09",
     "TASK-10",
