@@ -5,18 +5,18 @@
   "min_test_coverage_percent": 80,
   "target_model": "gemini-3.8-flash-high",
   "subagent_model_mode": "inherit",
-  "current_task_id": "TASK-02",
-  "current_task_file": "./tasks/TASK-02-docker-compose-and-profiles.md",
+  "current_task_id": "TASK-03",
+  "current_task_file": "./tasks/TASK-03-shared-contracts-events.md",
   "current_phase": "IDLE",
   "attempt_in_current_task": 0,
   "max_attempts_per_task": 3,
   "active_worker_subagent_id": null,
   "active_reviewer_subagent_id": null,
   "completed_tasks": [
-    "TASK-01"
+    "TASK-01",
+    "TASK-02"
   ],
   "pending_tasks_ordered": [
-    "TASK-02",
     "TASK-03",
     "TASK-04",
     "TASK-05",

@@ -1,0 +1,17 @@
+version: 1
+global:
+  # Дополнительные пути для извлечения идентификаторов из произвольных JSON-логов
+  trace_id_fields: ["trace_id", "traceId", "otel.trace_id"]
+  span_id_fields: ["span_id", "spanId", "otel.span_id"]
+  request_id_fields: ["id", "request_id", "req_id", "x_request_id"]
+  session_id_fields: ["session_id", "visit_session_id", "visit-session-id"]
+  visitor_id_fields: ["visitor_id", "provided_visitor_id", "ID", "player_id"]
+  operator_id_fields: ["operator_id", "operatorId"]
+
+services:
+  chat-session:
+    static_upstreams:
+      - "chat-com"
+  chat-com:
+    expected_noise_templates:
+      - "Operator (operator_id=<num>) was not found in cache"
