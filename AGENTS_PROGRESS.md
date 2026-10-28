@@ -35,7 +35,7 @@
 |---|---|---|---|---|---|---|---|
 | **01. TASK-01** | `DONE` | `APPROVED` | — | `./deploy/clickhouse`, `go.work` | [TASK-01](./tasks/TASK-01-workspace-and-clickhouse-ddl.md) | Инициализация `go.work` (6 модулей), стартовых `go.mod`, профилей памяти ClickHouse (`768MB`/`384MB`) и `init_schema.sql` | Все 11 файлов созданы, go work sync PASS, verify_task PASS |
 | **02. TASK-02** | `DONE` | `APPROVED` | TASK-01 | `./docker-compose.yml`, `./config` | [TASK-02](./tasks/TASK-02-docker-compose-and-profiles.md) | `docker-compose.yml` (7 контейнеров, `internal: true`, потолок `1648MB RAM`), `service_profiles.yaml` и проверка конфигурации | docker compose config PASS, verify_task PASS |
-| **03. TASK-03** | `TODO` | `PENDING` | TASK-01 | `./pkg/contracts` | [TASK-03](./tasks/TASK-03-shared-contracts-events.md) | Контракты событий: `events.go` (`NormalizedEvent`, `RawScriptRecord`, `ErrorClass`, `IdentityEdge`, `ServiceEdge`, `SanitizeFloat`) + тест | — |
+| **03. TASK-03** | `DONE` | `APPROVED` | TASK-01 | `./pkg/contracts` | [TASK-03](./tasks/TASK-03-shared-contracts-events.md) | Контракты событий: `events.go` (`NormalizedEvent`, `RawScriptRecord`, `ErrorClass`, `IdentityEdge`, `ServiceEdge`, `SanitizeFloat`) + тест | events.go, coverage: 100.0%, verify_task PASS |
 | **04. TASK-04** | `TODO` | `PENDING` | TASK-03 | `./pkg/contracts` | [TASK-04](./tasks/TASK-04-shared-contracts-rca-and-api.md) | Контракты RCA, Live Tilt Capture (`TiltTarget`, `TiltStatusResponse`, `IngestBatchRequest`) и всех HTTP DTO (`rca.go`, `api.go`) + тест | — |
 | **05. TASK-05** | `TODO` | `PENDING` | TASK-04 | `./services/ingest-service` | [TASK-05](./tasks/TASK-05-ingest-stream-reader.md) | Потоковый чтец `stream_reader.go` (`.json` массивы `*_part-*.json`, `.jsonl`, `.gz`, `.zip`) + расчёт `file_sha256` + тест | — |
 | **06. TASK-06** | `TODO` | `PENDING` | TASK-05 | `./services/ingest-service` | [TASK-06](./tasks/TASK-06-ingest-schema-normalizer.md) | Нормализатор `normalizer.go`: автоопределение 6 схем, исправление ложного `detected_level="error"`, расчёт `clock_skew_ms` + тест | — |
@@ -65,3 +65,4 @@
 
 - [2026-10-28 18:48] **TASK-01** — Воркер: go.work (6 модулей), 6 go.mod, ClickHouse memory profiles & DDL schema | Ревьюер: APPROVED (py ./verify_task.py TASK-01 PASS).
 - [2026-10-28 18:53] **TASK-02** — Воркер: docker-compose.yml (7 сервисов, 1648MB RAM), service_profiles.yaml | Ревьюер: APPROVED (docker compose config -q & py ./verify_task.py TASK-02 PASS).
+- [2026-10-28 18:59] **TASK-03** — Воркер: pkg/contracts/events.go, coverage: 100.0% | Ревьюер: APPROVED (py ./verify_task.py TASK-03 PASS).
