@@ -1,6 +1,6 @@
 # TASK-09: Батч-писатель в ClickHouse, HTTP API `:8081` и `Dockerfile` (`./services/ingest-service`)
 
-- **Статус:** `TODO`
+- **Статус:** `DONE`
 - **Зависимости:** `TASK-02`, `TASK-08`
 - **Область видимости (Scope):**
   - Читать: `./pkg/contracts/`, `./services/ingest-service/internal/`
@@ -124,15 +124,45 @@ py ./verify_task.py TASK-09
 
 ## Отчёт о выполнении (заполняется субагентом-воркером)
 
-- **Дата выполнения:** *(не заполнено)*
-- **Созданные/изменённые файлы:** *(не заполнено)*
-- **Результаты проверок и тестов:** *(не заполнено)*
-- **Заметки по реализации:** *(не заполнено)*
+- **Дата выполнения:** 2026-10-28 20:17 UTC
+- **Соблюдение цикла TDD (Contract → Tests → Code):**
+  - Шаг 1 (CONTRACT): объявлены сигнатуры `Writer` (`NewWriter`, `IsFileAlreadyIngested`, `RecordIngestedFile`, `FlushBatch`) и HTTP-маршруты `/health`, `/internal/ingest/browse`, `/internal/ingest/start`, `/internal/ingest/status/{job_id}`, `/internal/ingest/batch`.
+  - Шаг 2 (RED): написаны все контрактные, граничные и эталонные тесты в `server/http_test.go` с моком ClickHouse (`mockClickHouse` на `httptest.NewServer`), зафиксирован переход через фазу RED (FAIL на заглушках).
+  - Шаг 3 (GREEN): реализована 100% логика батч-писателя в ClickHouse HTTP (`JSONEachRow`, `best_effort`), обработчики API с асинхронной обработкой задач в горутине, приём батчей от Tilt, `cmd/ingest/main.go` с graceful shutdown и multi-stage `Dockerfile`.
+- **Созданные/изменённые файлы:**
+  - `services/ingest-service/internal/chwriter/writer.go` (305 строк)
+  - `services/ingest-service/internal/server/http.go` (340 строк)
+  - `services/ingest-service/internal/server/http_test.go` (635 строк)
+  - `services/ingest-service/cmd/ingest/main.go` (55 строк)
+  - `services/ingest-service/Dockerfile` (17 строк)
+- **Результаты проверок и тестов:**
+  - `go test -v -cover ./internal/server/...`: PASS, coverage `82.2% of statements` (выше требуемых 80%).
+  - Максимальное покрытие пакетов в `services/ingest-service`: `96.2%` (`drain`), `89.4%` (`normalizer`), `86.9%` (`reader`), `82.2%` (`server`).
+  - Эталонный «Золотой тест» (`TestGoldenRealLogExamples`): PASS (500 строк `chat-session` без ложных ошибок и с маскированием JWT `eyJhbGci`, 500 строк `chat-com` с детекцией сдвига часов `ClockSkewMs > 7000000`).
+  - `docker compose build ingest-service`: успешно собрался alpine-образ.
+  - `py ./verify_task.py TASK-09`: `[VERIFY PASSED] TASK-09 passed all automated checks!`.
+- **Заметки по реализации:**
+  - ClickHouse взаимодействует по штатному HTTP-интерфейсу через `FORMAT JSONEachRow` и `date_time_input_format=best_effort` с микросекундной точностью `DateTime64(9, 'UTC')`.
+  - Потоковое чтение сохраняет строгий лимит памяти: чтение чанками без `os.ReadFile`/`io.ReadAll` входных логов, буфер батчей сбрасывается каждые 5000 записей.
 
 ---
 
 ## Вердикт ревьюера (заполняется субагентом-ревьюером)
 
-- **Статус ревью:** `PENDING` *(выбрать: `APPROVED` | `CHANGES_REQUESTED`)*
-- **Проверенные контракты и тесты:** *(не заполнено)*
-- **Найденные замечания (если есть):** *(не заполнено)*
+- **Статус ревью:** `APPROVED`
+- **Проверенные контракты и тесты (TDD Coverage):**
+  - `services/ingest-service/internal/chwriter/writer.go`: проверено полное соответствие сигнатур `NewWriter`, `IsFileAlreadyIngested`, `RecordIngestedFile`, `FlushBatch` чертежу (Blueprint), формат `DateTime64(9, 'UTC')`, параметр `date_time_input_format=best_effort`, табличные схемы ClickHouse `logs_rca.events_raw`, `templates_dict`, `identity_edges`, `service_edges`, `ingested_files`.
+  - `services/ingest-service/internal/server/http.go`: проверены маршруты `GET /health`, `GET /internal/ingest/browse`, `POST /internal/ingest/start`, `GET /internal/ingest/status/{job_id}`, `POST /internal/ingest/batch`, потоковая передача записей, конвейер дедупликации по sha256, батчинг по 5000 записей, сбор предупреждений о сдвиге часов `ClockSkewMs > 60000`.
+  - `services/ingest-service/internal/server/http_test.go`: проверен тестовый набор из 7 тестов:
+    - `TestHealthEndpoint`: проверка 200 OK `{"status":"ok"}`;
+    - `TestBrowseEndpoint`: сканирование каталогов импорта и примеров, фильтрация неподдерживаемых файлов;
+    - `TestIngestStart_And_Status_And_Deduplication`: асинхронный запуск, опрос статуса, дедупликация файлов, детектирование `ClockSkewMs`;
+    - `TestIngestBatchEndpoint`: приём потока батчей от Tilt, передача в ClickHouse;
+    - `TestValidationAndErrors`: валидация тел запросов и обработка сбоев ClickHouse (HTTP 500);
+    - `TestCHWriter_DirectUnitTests`: прямые юнит-тесты на методы `Writer` с моком ClickHouse;
+    - `TestGoldenRealLogExamples`: золотой эталонный тест на 500 записях `chat-session` (маскирование JWT `eyJ...`, нормализация ложных error на HTTP 200/204 в INFO) и 500 записях `chat-com` (детектирование сдвига часов `ClockSkewMs > 7000000`).
+  - Покрытие тестами целевого пакета `services/ingest-service/internal/server`: **82.2% of statements** (при требуемом пороге >= 75-80%). Общее покрытие `statements` по всему модулю `internal`: **87.6%**.
+  - `services/ingest-service/cmd/ingest/main.go`: корректный запуск с Graceful Shutdown (SIGINT/SIGTERM), чтение ENV `PORT`, `CLICKHOUSE_HTTP_URL`, `IMPORT_DIR`, `EXAMPLE_DIR`.
+  - `services/ingest-service/Dockerfile`: чистая multi-stage сборка Alpine (`docker compose build ingest-service` завершается с кодом 0).
+  - Автоматический верификатор `py ./verify_task.py TASK-09`: успешно пройден (`[VERIFY PASSED] TASK-09 passed all automated checks!`).
+- **Найденные замечания (если есть):** Замечаний нет. Все 8 пунктов чек-листа `REVIEWER_GUIDE.md` полностью соблюдены.
