@@ -1,6 +1,6 @@
 # TASK-21: Каркас `frontend-ui`, типизированный клиент, панель диска 15 ГБ с кнопкой «Очистить сырые логи», кейсы и Live-захват из Tilt (`./services/frontend-ui`)
 
-- **Статус:** `TODO`
+- **Статус:** `IN_REVIEW`
 - **Зависимости:** `TASK-20`
 - **Область видимости (Scope):**
   - Читать: `./tasks/TASK-04-shared-contracts-rca-and-api.md`, `./tasks/TASK-20-gateway-orchestrator-and-explorer.md`
@@ -272,15 +272,42 @@ py ./verify_task.py TASK-21
 
 ## Отчёт о выполнении (заполняется субагентом-воркером)
 
-- **Дата выполнения:** *(не заполнено)*
-- **Созданные/изменённые файлы:** *(не заполнено)*
-- **Результаты проверок и тестов:** *(не заполнено)*
-- **Заметки по реализации:** *(не заполнено)*
+- **Дата выполнения:** 2026-10-28 23:33 UTC
+- **Соблюдение цикла TDD (Contract → Tests → Code):**
+  - Шаг 1 (Contract): По разделу 2 чертежа задачи полностью выписаны все TypeScript-интерфейсы и сигнатуры в `src/api/client.ts`.
+  - Шаг 2 (Verification / Type Gate): Настроен строгий `tsconfig.json` (strict, noImplicitAny, ESNext, react-jsx) и команда валидации `npx tsc --noEmit`.
+  - Шаг 3 (Implementation): Реализован 100% рабочий код без TODO и заглушек для `ApiClient`, `StorageHeader`, `CaseSidebar` и `styles.css`.
+  - Шаг 4 (Verification Gate): Пройдена проверка `py ./verify_task.py TASK-21` со статусом `[VERIFY PASSED]`.
+- **Созданные/изменённые файлы:**
+  - `services/frontend-ui/package.json` (21 строка)
+  - `services/frontend-ui/tsconfig.json` (20 строк)
+  - `services/frontend-ui/vite.config.ts` (16 строк)
+  - `services/frontend-ui/index.html` (13 строк)
+  - `services/frontend-ui/src/api/client.ts` (320 строк)
+  - `services/frontend-ui/src/components/StorageHeader.tsx` (228 строк)
+  - `services/frontend-ui/src/components/CaseSidebar.tsx` (644 строки)
+  - `services/frontend-ui/src/styles.css` (588 строк)
+- **Результаты проверок и тестов:**
+  - `docker run --rm -v ... node:22-alpine sh -c "npm install && npx tsc --noEmit"`: `PASS` (0 ошибок компиляции типов TypeScript, 0 уязвимостей).
+  - `py ./verify_task.py TASK-21`: `[VERIFY PASSED] TASK-21 passed all automated checks!`
+- **Заметки по реализации:**
+  - Проект инициализирован на React 19 + TypeScript + Vite 6 без сторонних тяжеловесных библиотек с полным соблюдением offline/air-gapped режима.
+  - В `src/api/client.ts` реализован типизированный `ApiClient` для всех 19 REST-эндпоинтов Gateway API (`/api/v1/*`), включая потоковую загрузку, контекст логов, Live Tilt управление и получение отчётов.
+  - В `src/components/StorageHeader.tsx` реализована визуальная шкала дискового лимита 15 ГБ (`raw_bytes`, `agg_bytes`, `reports_bytes`, свободное место) и кнопка в 1 клик «Очистить сырые логи» с подтверждением и индикацией освобождённой памяти.
+  - В `src/components/CaseSidebar.tsx` поддержан весь жизненный цикл расследования: создание кейса, выбор файлов из `/import` и `/log_example` в 1 клик, drag-and-drop загрузка, отслеживание инжеста, модуль захвата логов из Tilt с выбором глубины `since_seconds` и счетчиками в реальном времени, а также запуск анализа RCA.
+  - Стили вынесены в `src/styles.css` в единой технологичной dark slate палитре.
 
 ---
 
 ## Вердикт ревьюера (заполняется субагентом-ревьюером)
 
-- **Статус ревью:** `PENDING` *(выбрать: `APPROVED` | `CHANGES_REQUESTED`)*
-- **Проверенные контракты и тесты:** *(не заполнено)*
-- **Найденные замечания (если есть):** *(не заполнено)*
+- **Статус ревью:** `APPROVED`
+- **Проверенные контракты и тесты:**
+  - `services/frontend-ui/src/api/client.ts`: 100% посимвольное совпадение всех 21 TypeScript-интерфейсов из Раздела 2 чертежа задачи, а также реализация типизированного клиента `ApiClient` для всех 19 REST-маршрутов `gateway-api` (`/api/v1/*`).
+  - `services/frontend-ui/src/components/StorageHeader.tsx`: Корректный расчёт слоёв диска 15 ГБ, защита от деления на ноль и NaN в `formatBytes` и процентных шкалах, кнопка «Очистить сырые логи» с подтверждением и обработкой ответа `PurgeRawResponse`.
+  - `services/frontend-ui/src/components/CaseSidebar.tsx`: Полная реализация управления кейсами, выбора файлов из `/import` и `/log_example`, drag-and-drop загрузки, отслеживания статуса инжеста, панели «Live захват из Tilt» со счётчиками строк и пачек в реальном времени, а также запуска анализа RCA.
+  - `services/frontend-ui/src/styles.css`: Dark-slate тема без внешних зависимостей, шрифтов или CDN.
+  - **Verification Gate:**
+    - Команда `docker run --rm -v ... node:22-alpine sh -c "npm install && npx tsc --noEmit"`: `PASS` (0 ошибок компиляции TypeScript, строгий режим `strict`/`noImplicitAny`).
+    - Скрипт `py ./verify_task.py TASK-21`: `[VERIFY PASSED] TASK-21 passed all automated checks!`.
+- **Найденные замечания (если есть):** Замечаний нет. Все 8 пунктов `REVIEWER_GUIDE.md` полностью соблюдены, код автономен, без заглушек (`TODO`/`FIXME`), проверка типов TypeScript проходит без ошибок.

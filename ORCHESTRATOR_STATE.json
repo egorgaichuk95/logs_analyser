@@ -5,8 +5,8 @@
   "min_test_coverage_percent": 80,
   "target_model": "gemini-3.8-flash-high",
   "subagent_model_mode": "inherit",
-  "current_task_id": "TASK-21",
-  "current_task_file": "./tasks/TASK-21-frontend-shell-storage-and-cases.md",
+  "current_task_id": "TASK-22",
+  "current_task_file": "./tasks/TASK-22-frontend-rca-evidence-gemini-and-e2e.md",
   "current_phase": "IDLE",
   "attempt_in_current_task": 0,
   "max_attempts_per_task": 3,
@@ -32,14 +32,14 @@
     "TASK-17",
     "TASK-18",
     "TASK-19",
-    "TASK-20"
+    "TASK-20",
+    "TASK-21"
   ],
   "pending_tasks_ordered": [
-    "TASK-21",
     "TASK-22",
     "TASK-23"
   ],
-  "last_checkpoint_utc": "2026-10-28T22:24:00Z",
-  "last_checkpoint_note": "TASK-20 approved and verified. Ready to start TASK-21.",
+  "last_checkpoint_utc": "2026-10-28T22:38:00Z",
+  "last_checkpoint_note": "TASK-21 approved and verified. Ready to start TASK-22.",
   "history": []
 }
