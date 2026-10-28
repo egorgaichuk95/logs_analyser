@@ -1,6 +1,6 @@
 # TASK-11: Сигнал S1 — Граф идентификаторов и цепочки запросов (`./services/rca-engine/internal/idgraph`)
 
-- **Статус:** `TODO`
+- **Статус:** `IN_REVIEW`
 - **Зависимости:** `TASK-04`
 - **Область видимости (Scope):**
   - Читать: `./pkg/contracts/`
@@ -88,15 +88,38 @@ py ./verify_task.py TASK-11
 
 ## Отчёт о выполнении (заполняется субагентом-воркером)
 
-- **Дата выполнения:** *(не заполнено)*
-- **Созданные/изменённые файлы:** *(не заполнено)*
-- **Результаты проверок и тестов:** *(не заполнено)*
-- **Заметки по реализации:** *(не заполнено)*
+- **Дата выполнения:** 2026-10-28
+- **Соблюдение цикла TDD (Contract → Tests → Code):**
+  - Шаг 1 (Contract): зафиксированы структуры `Chain`, `Result` и сигнатуры `BuildChainsAndScores`, `FindChainByKey` по Blueprint.
+  - Шаг 2 (RED Tests First): написаны исчерпывающие тесты в `graph_test.go` (транзитивная склейка 4 событий, pod ±50ms, отсев длинных фоновых трейсов, логика с `CANCELED`, защита от деления на 0 и пустых данных, `IdentityEdge`, `FindChainByKey`, сериализация JSON). Тесты падали в фазе RED.
+  - Шаг 3 (GREEN Implementation): реализован 100% алгоритм без TODO и заглушек.
+  - Шаг 4 (Coverage & Verification Gate): запущены тесты и `verify_task.py TASK-11`.
+- **Созданные/изменённые файлы:**
+  - `./services/rca-engine/internal/idgraph/graph.go` (366 строк)
+  - `./services/rca-engine/internal/idgraph/graph_test.go` (584 строки)
+  - `./tasks/TASK-11-rca-identity-graph-s1.md`
+- **Результаты проверок и тестов:**
+  - `go test -v -cover ./internal/idgraph/...` — все 9 тестов пройдены (`PASS`).
+  - Покрытие: `coverage: 94.4% of statements` (требуемый минимум: `>= 80.0%`).
+  - Автоматический скрипт: `py ./verify_task.py TASK-11` выдал `[VERIFY PASSED]`.
+- **Заметки по реализации:**
+  - Алгоритм Union-Find (Disjoint Set Union с эвристиками сжатия пути и объединения по рангу) группирует события по составным ключам идентификаторов (`req:`, `tr:`, `sess:`, `vis:`) и рёбрам `IdentityEdge`.
+  - Реализован фильтр длинных/фоновых циклов (`count > 30`, `span > 60s`, `consumer` в `SourcePlace`, сообщение `"fetched"`). Фоновые трейсы игнорируются при склейке и отсеиваются из цепочек инцидента.
+  - Реализован fallback по близости внутри pod (`|Δt| <= 50ms`) для ошибочных/предупреждающих событий.
+  - Определение `OriginEvent` пропускает `contracts.ErrClassCanceled`, если в цепочке есть другие ошибки. При наличии только `CANCELED` назначается коэффициент `0.2`.
+  - Все оценки $S1 \in [0.0..1.0]$ защищены от деления на ноль при $N_{\text{err\_chains}} == 0$ и нормализуются через `contracts.SanitizeFloat`.
+  - Автоматически выводятся межсервисные переходы `DerivedEdges` внутри цепочек с источником доказательства `trace_propagation` и подсчётом `CallCount`/`ErrorCount`.
 
 ---
 
 ## Вердикт ревьюера (заполняется субагентом-ревьюером)
 
-- **Статус ревью:** `PENDING` *(выбрать: `APPROVED` | `CHANGES_REQUESTED`)*
-- **Проверенные контракты и тесты:** *(не заполнено)*
-- **Найденные замечания (если есть):** *(не заполнено)*
+- **Статус ревью:** `APPROVED`
+- **Проверенные контракты и тесты (TDD Coverage):**
+  - Файлы в Scope: `./services/rca-engine/internal/idgraph/graph.go`, `./services/rca-engine/internal/idgraph/graph_test.go`. Чужие сервисы не затронуты.
+  - Посимвольный аудит контрактов: структуры `Chain`, `Result`, экспортируемые функции `BuildChainsAndScores`, `FindChainByKey`, JSON-теги (`chain_id`, `events`, `origin_event`), интеграция с типами `./pkg/contracts` (`NormalizedEvent`, `IdentityEdge`, `ServiceEdge`) полностью соответствуют Blueprint.
+  - TDD-аудит и граничные сценарии: проверены 9 комплексных тестов (транзитивная склейка по нескольким идентификаторам, pod proximity fallback ±50ms, отсев длинных/фоновых трейсов >30 событий / >60с / "fetched" / consumer, приоритет выбора ошибок над `ErrClassCanceled` и пониженный вес 0.2 при единственной `ErrClassCanceled`, защита от деления на ноль при $N_{\text{err\_chains}} == 0$, `contracts.SanitizeFloat`, связывание через `IdentityEdge`, поиск по ключу `FindChainByKey`, сериализация JSON).
+  - Покрытие тестами: `coverage: 94.4% of statements` (минимально требуемый порог 80.0% уверенно превышен).
+  - Заглушки: `TODO`, `FIXME`, пустые тела функций отсутствуют.
+  - Верификатор: `py ./verify_task.py TASK-11` завершён успешно (`[VERIFY PASSED]`, exit code 0).
+- **Найденные замечания (если есть):** Замечаний нет. Код чистый, безопасный, полностью детерминированный и соответствует всем требованиям спецификации.

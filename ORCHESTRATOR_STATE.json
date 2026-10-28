@@ -5,8 +5,8 @@
   "min_test_coverage_percent": 80,
   "target_model": "gemini-3.8-flash-high",
   "subagent_model_mode": "inherit",
-  "current_task_id": "TASK-11",
-  "current_task_file": "./tasks/TASK-11-rca-identity-graph-s1.md",
+  "current_task_id": "TASK-12",
+  "current_task_file": "./tasks/TASK-12-rca-service-topology-s6.md",
   "current_phase": "IDLE",
   "attempt_in_current_task": 0,
   "max_attempts_per_task": 3,
@@ -22,10 +22,10 @@
     "TASK-07",
     "TASK-08",
     "TASK-09",
-    "TASK-10"
+    "TASK-10",
+    "TASK-11"
   ],
   "pending_tasks_ordered": [
-    "TASK-11",
     "TASK-12",
     "TASK-13",
     "TASK-14",
