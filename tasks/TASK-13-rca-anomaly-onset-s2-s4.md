@@ -1,6 +1,6 @@
 # TASK-13: Сигналы S2 и S4 — Сравнение с Baseline, отсев шума и поиск точки начала Onset (`./services/rca-engine/internal/timeseries`)
 
-- **Статус:** `TODO`
+- **Статус:** `IN_REVIEW`
 - **Зависимости:** `TASK-12`
 - **Область видимости (Scope):**
   - Читать: `./pkg/contracts/`
@@ -106,15 +106,36 @@ py ./verify_task.py TASK-13
 
 ## Отчёт о выполнении (заполняется субагентом-воркером)
 
-- **Дата выполнения:** *(не заполнено)*
-- **Созданные/изменённые файлы:** *(не заполнено)*
-- **Результаты проверок и тестов:** *(не заполнено)*
-- **Заметки по реализации:** *(не заполнено)*
+- **Дата выполнения:** 2026-10-28 21:18 UTC
+- **Соблюдение цикла TDD (Contract → Tests → Code):**
+  1. **CONTRACT:** В `services/rca-engine/internal/timeseries/anomaly.go` объявлены структуры `BucketPoint`, `TemplateStats` и сигнатура функции `AnalyzeSeries` строго по Blueprint.
+  2. **RED (TESTS FIRST):** В `services/rca-engine/internal/timeseries/anomaly_test.go` написаны 8 сценариев тестов, покрывающих постоянный шум `cache:98`, поиск точки начала `pool_exhausted` и `upstream_timeout`, аппроксимацию Пуассона ($z \le 0 \to 1.0$, $z > 0$), fallback на `historicalBaseRatePerMin`, защиту от деления на 0/NaN во всех полях с проверкой JSON-сериализации, автоматический выбор baseline при `baselineEnd.IsZero()`, и порог срабатывания с колебаниями baseline $\mu + 3\sigma$. Первичный запуск тестов завершился с `FAIL` (красная фаза).
+  3. **GREEN (CODE):** Реализована 100% рабочая логика в `anomaly.go` строго по формулам без TODO и заглушек.
+  4. **VERIFY GATE:** Запущены тесты и автоматический верификатор `py ./verify_task.py TASK-13` со статусом `[VERIFY PASSED]`.
+- **Созданные/изменённые файлы:**
+  - `services/rca-engine/internal/timeseries/anomaly.go` (285 строк) — реализация расчёта сигналов S2 (`OnsetScore`), S4 (`NoveltyScore`), классификации фонового шума (`IsConstantNoise`), аппроксимации `PoissonPValue` и защиты от `NaN`/`Inf`;
+  - `services/rca-engine/internal/timeseries/anomaly_test.go` (305 строк) — исчерпывающие тесты для всех сценариев Blueprint, граничных условий и математической безопасности.
+- **Результаты проверок и тестов:**
+  - `go test -v -cover ./internal/timeseries/...` — все тесты пройдены (`PASS`).
+  - Покрытие кода пакета: `coverage: 91.8% of statements` (минимально требуемый порог: 80.0%).
+  - Автоматический скрипт: `py ./verify_task.py TASK-13` завершился со статусом `[VERIFY PASSED]`.
+- **Заметки по реализации:**
+  - Точное посимвольное соответствие контрактам `BucketPoint`, `TemplateStats`, `AnalyzeSeries`.
+  - Все вещественные значения (`BaselineRatePerMin`, `IncidentRatePerMin`, `GrowthRatio`, `PoissonPValue`, `OnsetScore`, `NoveltyScore`) оборачиваются в `contracts.SanitizeFloat`.
+  - Постоянный шум (`cache:98`) корректно классифицируется (`IsConstantNoise = true`, `NoveltyScore = 0.0`, `OnsetScore = 0.0`) и исключается из определения $t_{\min}$ для нешумовых кандидатов.
+  - При отсутствии точек до `baselineEnd` используется `historicalBaseRatePerMin[tpl]`.
+  - При `baselineEnd.IsZero()` автоматически определяется baseline по первым 20% интервала (с учётом детекции первого скачка).
 
 ---
 
 ## Вердикт ревьюера (заполняется субагентом-ревьюером)
 
-- **Статус ревью:** `PENDING` *(выбрать: `APPROVED` | `CHANGES_REQUESTED`)*
-- **Проверенные контракты и тесты:** *(не заполнено)*
-- **Найденные замечания (если есть):** *(не заполнено)*
+- **Статус ревью:** `APPROVED`
+- **Проверенные контракты и тесты (TDD Coverage):**
+  - Проверено посимвольное соответствие контрактов `BucketPoint`, `TemplateStats`, сигнатуры `AnalyzeSeries` в `./services/rca-engine/internal/timeseries/anomaly.go` спецификации Blueprint и `./pkg/contracts/rca.go`.
+  - Все математические формулы сигналов S2 (`OnsetScore`), S4 (`NoveltyScore`), классификации постоянного фонового шума (`IsConstantNoise`), аппроксимации Пуассона (`PoissonPValue`) и порога $\mu + 3\sigma$ строго соблюдены.
+  - Реализована строгая защита от деления на ноль, отрицательных логарифмов и `NaN`/`Inf` с оборачиванием всех вещественных полей в `contracts.SanitizeFloat`.
+  - В `./services/rca-engine/internal/timeseries/anomaly_test.go` реализовано 8 исчерпывающих TDD-тестов: постоянный фоновый шум (`cache:98`), определение Onset/Novelty (`pool_exhausted`, `upstream_timeout`), независимость $t_{\min}$ от фонового шума, аппроксимация Пуассона ($z \le 0$, $z > 0$), fallback на исторический baseline, математическая безопасность и JSON-сериализация, автоматический расчет baseline при `baselineEnd.IsZero()`, динамический порог бакета с колебаниями.
+  - Лично выполнен запуск автоматического верификатора `py ./verify_task.py TASK-13`: `[VERIFY PASSED]`, фактическое покрытие пакета тестами составляет `coverage: 91.8% of statements` (порог >= 80.0%).
+  - Заглушки, TODO и хардкод отсутствуют; файлы вне Scope не затронуты.
+- **Найденные замечания (если есть):** Замечаний нет. Реализация полностью соответствует контрактам и критериям качества.
