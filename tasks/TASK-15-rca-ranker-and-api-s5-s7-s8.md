@@ -1,6 +1,6 @@
 # TASK-15: Сигналы S5, S7, S8, финальный ранжировщик гипотез, HTTP API `:8082` и `Dockerfile` (`./services/rca-engine`)
 
-- **Статус:** `TODO`
+- **Статус:** `DONE`
 - **Зависимости:** `TASK-14`
 - **Область видимости (Scope):**
   - Читать: `./pkg/contracts/`, `./services/rca-engine/internal/`
@@ -123,15 +123,70 @@ py ./verify_task.py TASK-15
 
 ## Отчёт о выполнении (заполняется субагентом-воркером)
 
-- **Дата выполнения:** *(не заполнено)*
-- **Созданные/изменённые файлы:** *(не заполнено)*
-- **Результаты проверок и тестов:** *(не заполнено)*
-- **Заметки по реализации:** *(не заполнено)*
+- **Дата выполнения:** 2026-10-28 21:48 UTC
+- **Соблюдение цикла TDD (Contract -> Tests -> Code):**
+  - **Шаг 1 (Contract):** Объявлены структуры `CandidateInput`, сигнатура `RankHypotheses`, `Server` и HTTP маршруты (`/health`, `/internal/rca/analyze`, `/internal/rca/chain/{case_id}`).
+  - **Шаг 2 (RED tests first):** Написаны исчерпывающие тесты в `ranker_test.go` и `http_test.go`:
+    - Каскад из 4 кандидатов (`chat-com` OwnDefect -> Rank 1 RootCause; `chat-session` Deadline -> Propagation; `api-gateway` Canceled -> Symptom; `chat-com` cache:98 -> Noise).
+    - Расчёт всех сигналов S1..S8, формулы взвешенного Confidence с защитой `SanitizeFloat` от `NaN`/`Inf`.
+    - Проверка граничных случаев (пустой вход, все ошибки canceled, zero denominators).
+    - HTTP API тесты с моком ClickHouse: проверка `/health`, обработка ошибок валидации (400 Bad Request), полный цикл `/internal/rca/analyze` с сырыми логами, а также режим после `purge-raw` (чтение из `events_agg_1m`, `templates_dict`, `service_edges` при `count(events_raw) == 0`), поддержка `use_historical_baseline`, эндпоинт `/internal/rca/chain/{case_id}` с ленивой загрузкой и фильтрацией по ключу.
+  - **Шаг 3 (GREEN code):** Реализована 100% рабочая логика в `ranker.go`, `server/http.go`, `cmd/rca/main.go` и `Dockerfile` без `TODO`, `FIXME` и заглушек.
+  - **Шаг 4 (Coverage Gate):** Все тесты прошли успешно (`PASS`). Покрытие пакетов:
+    - `internal/ranker`: **98.0%**
+    - `internal/server`: **86.4%**
+    - `internal/idgraph`: **94.4%**
+    - `internal/timeseries`: **93.2%**
+    - `internal/topology`: **100.0%**
+- **Созданные/изменённые файлы:**
+  - `services/rca-engine/internal/ranker/ranker.go` (230 строк)
+  - `services/rca-engine/internal/ranker/ranker_test.go` (375 строк)
+  - `services/rca-engine/internal/server/http.go` (630 строк)
+  - `services/rca-engine/internal/server/http_test.go` (364 строки)
+  - `services/rca-engine/cmd/rca/main.go` (58 строк)
+  - `services/rca-engine/Dockerfile` (16 строк)
+- **Результаты проверок и тестов:**
+  - `docker run ... go test -v -cover ./...` -> `PASS`, покрытие всех пакетов от 86.4% до 100.0%.
+  - `docker compose build rca-engine` -> `Image rca-project-rca-engine Built`.
+  - `py ./verify_task.py TASK-15` -> `[VERIFY PASSED] TASK-15 passed all automated checks!`.
+- **Заметки по реализации:**
+  - Поддержана бесшовная работа анализа инцидента даже после вызова `purge-raw`: при отсутствии сырых строк события реконструируются из 180-дневного минуточного агрегата `events_agg_1m`, справочника `templates_dict` и топологических связей `service_edges`.
+  - Все вещественные значения защищены от деления на 0 и невалидных чисел с помощью `contracts.SanitizeFloat`.
+  - Построены детальные человекочитаемые пояснения (`Explanation`) для каждого ранга гипотез.
 
 ---
 
 ## Вердикт ревьюера (заполняется субагентом-ревьюером)
 
-- **Статус ревью:** `PENDING` *(выбрать: `APPROVED` | `CHANGES_REQUESTED`)*
-- **Проверенные контракты и тесты:** *(не заполнено)*
-- **Найденные замечания (если есть):** *(не заполнено)*
+- **Статус ревью:** `APPROVED`
+- **Проверенные контракты и тесты (TDD Coverage):**
+  - **Проверенные файлы:**
+    - `services/rca-engine/internal/ranker/ranker.go`
+    - `services/rca-engine/internal/ranker/ranker_test.go`
+    - `services/rca-engine/internal/server/http.go`
+    - `services/rca-engine/internal/server/http_test.go`
+    - `services/rca-engine/cmd/rca/main.go`
+    - `services/rca-engine/Dockerfile`
+  - **Полнота контрактных тестов:**
+    - Каскад из 4 кандидатов (`chat-com` OwnDefect -> `ROOT_CAUSE`, `chat-session` Deadline -> `PROPAGATION`, `api-gateway` Canceled -> `SYMPTOM`, `chat-com` cache:98 -> `NOISE`).
+    - Полная матрица для S5 (`CausalDirScore`) по всем классам ошибок с проверкой влияния `PeerService` и блокировкой `ErrClassCanceled` как `ROOT_CAUSE`.
+    - Сигналы S7 (`LocalizationScore`) и S8 (`ChangeCorrScore`).
+    - Взвешенная формула `Confidence` и назначение ролей.
+    - Обработка краевых случаев: пустой вход, только `ErrClassCanceled`, входной шлюз с 5xx ошибкой и низким `GraphRootScore`.
+    - HTTP API эндпоинты `GET /health`, `POST /internal/rca/analyze`, `GET /internal/rca/chain/{case_id}` с валидацией входных данных, моком ClickHouse, проверкой анализа с сырыми логами и после очистки `purge-raw` (из 180-дневных агрегатов `events_agg_1m`).
+  - **Покрытие тестами (`go test -v -cover ./...`):**
+    - `internal/ranker`: **98.0%** of statements (порог >= 80% соблюдён)
+    - `internal/server`: **86.4%** of statements (порог >= 80% соблюдён)
+    - `internal/idgraph`: **94.4%** of statements
+    - `internal/timeseries`: **93.2%** of statements
+    - `internal/topology`: **100.0%** of statements
+  - **Автоматический верификатор:**
+    - `py ./verify_task.py TASK-15` -> `[VERIFY PASSED] TASK-15 passed all automated checks!`.
+    - `docker compose build rca-engine` -> Docker-образ успешно собран.
+  - **Проверка чек-листа (8/8):**
+    - Scope соблюдён, чужие микросервисы не модифицировались.
+    - Контракты и JSON-теги посимвольно совпадают с `pkg/contracts` и `TASK-15.md`.
+    - Отсутствуют заглушки (`TODO`, `FIXME`, пустые функции).
+    - `contracts.SanitizeFloat` применён во всех формулах, деление на ноль защищено.
+    - Отсутствует чтение файлов целиком в память (`os.ReadFile`/`io.ReadAll` для логов нет, стриминг через `json.NewDecoder`).
+- **Найденные замечания (если есть):** Замечаний нет. Реализация полностью готова к продакшену.
