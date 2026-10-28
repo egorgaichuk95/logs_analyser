@@ -5,8 +5,8 @@
   "min_test_coverage_percent": 80,
   "target_model": "gemini-3.8-flash-high",
   "subagent_model_mode": "inherit",
-  "current_task_id": "TASK-05",
-  "current_task_file": "./tasks/TASK-05-ingest-stream-reader.md",
+  "current_task_id": "TASK-06",
+  "current_task_file": "./tasks/TASK-06-ingest-schema-normalizer.md",
   "current_phase": "IDLE",
   "attempt_in_current_task": 0,
   "max_attempts_per_task": 3,
@@ -16,10 +16,10 @@
     "TASK-01",
     "TASK-02",
     "TASK-03",
-    "TASK-04"
+    "TASK-04",
+    "TASK-05"
   ],
   "pending_tasks_ordered": [
-    "TASK-05",
     "TASK-06",
     "TASK-07",
     "TASK-08",
