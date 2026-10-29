@@ -287,6 +287,44 @@ TASK_SPECS = {
         "min_cov": 0.0,
         "docker_service": None,
     },
+    "TASK-24": {
+        "files": [
+            "services/frontend-ui/src/types/navigation.ts",
+            "services/frontend-ui/src/components/TopNavHeader.tsx",
+            "services/frontend-ui/src/components/IngestAndTiltPage.tsx",
+            "services/frontend-ui/src/styles.css",
+        ],
+        "go_dir": None,
+        "pkg_rel": None,
+        "min_cov": 0.0,
+        "docker_service": None,
+        "frontend_tsc": True,
+    },
+    "TASK-25": {
+        "files": [
+            "services/frontend-ui/src/components/HypothesesPage.tsx",
+            "services/frontend-ui/src/components/TopologyAndTimelinePage.tsx",
+            "services/frontend-ui/src/styles.css",
+        ],
+        "go_dir": None,
+        "pkg_rel": None,
+        "min_cov": 0.0,
+        "docker_service": None,
+        "frontend_tsc": True,
+    },
+    "TASK-26": {
+        "files": [
+            "services/frontend-ui/src/components/ChainAndContextPage.tsx",
+            "services/frontend-ui/src/components/EvidenceAndGeminiPanel.tsx",
+            "services/frontend-ui/src/App.tsx",
+            "services/frontend-ui/src/styles.css",
+        ],
+        "go_dir": None,
+        "pkg_rel": None,
+        "min_cov": 0.0,
+        "docker_service": "frontend-ui",
+        "frontend_build": True,
+    },
 }
 
 FORBIDDEN_PATTERNS = [
