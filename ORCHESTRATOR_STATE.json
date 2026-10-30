@@ -5,8 +5,8 @@
   "min_test_coverage_percent": 80,
   "target_model": "gemini-3.8-flash-high",
   "subagent_model_mode": "inherit",
-  "current_task_id": "TASK-26",
-  "current_task_file": "./tasks/TASK-26-frontend-v2-chains-evidence-and-app-integration.md",
+  "current_task_id": "TASK-27",
+  "current_task_file": "./tasks/TASK-27-intuitive-russian-rca-story-and-colorful-theme.md",
   "current_phase": "IDLE",
   "attempt_in_current_task": 0,
   "max_attempts_per_task": 3,
@@ -37,13 +37,15 @@
     "TASK-22",
     "TASK-23",
     "TASK-24",
-    "TASK-25"
-  ],
-  "pending_tasks_ordered": [
+    "TASK-25",
     "TASK-26"
   ],
-  "last_checkpoint_utc": "2026-10-30T09:48:00Z",
-  "last_checkpoint_note": "TASK-25 approved and completed. Ready for TASK-26.",
+  "pending_tasks_ordered": [
+    "TASK-27",
+    "TASK-28"
+  ],
+  "last_checkpoint_utc": "2026-10-30T14:08:00Z",
+  "last_checkpoint_note": "TASK-26 completed. Added TASK-27 and TASK-28 for Intuitive Russian UI, Problem Logs & Correlation Panel, Colorful Palette, and Classic/Engineering Mode switcher.",
   "history": [
     {
       "task_id": "TASK-24",

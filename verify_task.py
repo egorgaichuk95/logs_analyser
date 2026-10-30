@@ -325,6 +325,33 @@ TASK_SPECS = {
         "docker_service": "frontend-ui",
         "frontend_build": True,
     },
+    "TASK-27": {
+        "files": [
+            "services/frontend-ui/src/utils/humanRcaTranslator.ts",
+            "services/frontend-ui/src/components/SimpleRcaOverviewPage.tsx",
+            "services/frontend-ui/src/styles.css",
+        ],
+        "go_dir": None,
+        "pkg_rel": None,
+        "min_cov": 0.0,
+        "docker_service": None,
+        "frontend_tsc": True,
+    },
+    "TASK-28": {
+        "files": [
+            "services/frontend-ui/src/components/ProblemLogsAndCorrelationPanel.tsx",
+            "services/frontend-ui/src/components/SimpleRcaOverviewPage.tsx",
+            "services/frontend-ui/src/components/TopNavHeader.tsx",
+            "services/frontend-ui/src/types/navigation.ts",
+            "services/frontend-ui/src/App.tsx",
+            "services/frontend-ui/src/styles.css",
+        ],
+        "go_dir": None,
+        "pkg_rel": None,
+        "min_cov": 0.0,
+        "docker_service": "frontend-ui",
+        "frontend_build": True,
+    },
 }
 
 FORBIDDEN_PATTERNS = [

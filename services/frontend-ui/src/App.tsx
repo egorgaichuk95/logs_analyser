@@ -1,269 +1,382 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { api, CaseMeta, AnalyzeCaseResponse } from './api/client';
-import { StorageHeader } from './components/StorageHeader';
-import { CaseSidebar } from './components/CaseSidebar';
-import { RcaDashboard } from './components/RcaDashboard';
+import { api, CaseMeta, AnalyzeCaseResponse, CreateCaseRequest } from './api/client';
+import { AppPageId } from './types/navigation';
+import { TopNavHeader } from './components/TopNavHeader';
+import { IngestAndTiltPage } from './components/IngestAndTiltPage';
+import { HypothesesPage } from './components/HypothesesPage';
+import { TopologyAndTimelinePage } from './components/TopologyAndTimelinePage';
+import { ChainAndContextPage } from './components/ChainAndContextPage';
 import { EvidenceAndGeminiPanel } from './components/EvidenceAndGeminiPanel';
 
 export const App: React.FC = () => {
-  // Selected Case
+  // Cases state
+  const [cases, setCases] = useState<CaseMeta[]>([]);
   const [activeCase, setActiveCase] = useState<CaseMeta | null>(null);
+  const [loadingCases, setLoadingCases] = useState<boolean>(true);
 
-  // Analysis result
+  // Analysis state
   const [analysis, setAnalysis] = useState<AnalyzeCaseResponse | null>(null);
   const [loadingAnalysis, setLoadingAnalysis] = useState<boolean>(false);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
-  // Active Tab: 'rca' | 'evidence' | 'explorer'
-  const [activeTab, setActiveTab] = useState<'rca' | 'evidence' | 'explorer'>('rca');
+  // Active page state: 'ingest' | 'hypotheses' | 'topology' | 'chains' | 'evidence'
+  const [activePage, setActivePage] = useState<AppPageId>('ingest');
 
-  // Log Explorer Search state (tab 3)
-  const [explorerQuery, setExplorerQuery] = useState<string>('');
-  const [explorerKey, setExplorerKey] = useState<string>('');
+  // Deep-link state across pages
+  const [initialChainKey, setInitialChainKey] = useState<string | undefined>(undefined);
+  const [highlightEvidenceId, setHighlightEvidenceId] = useState<string | undefined>(undefined);
 
-  // 1. Load latest analysis when active case changes
-  const loadCaseAnalysis = useCallback(async (caseId: string) => {
+  // Welcome screen creation modal state
+  const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
+  const [newCaseTitle, setNewCaseTitle] = useState<string>('');
+  const [newCaseDesc, setNewCaseDesc] = useState<string>('');
+  const [creatingCase, setCreatingCase] = useState<boolean>(false);
+  const [createCaseError, setCreateCaseError] = useState<string | null>(null);
+
+  // 1. Fetch analysis for a specific case
+  const loadCaseAnalysis = useCallback(async (caseId: string): Promise<AnalyzeCaseResponse | null> => {
     setLoadingAnalysis(true);
-    setAnalysisError(null);
     try {
       const data = await api.getAnalysis(caseId);
       setAnalysis(data);
+      return data;
     } catch {
-      // If analysis not found yet, set null gracefully
       setAnalysis(null);
+      return null;
     } finally {
       setLoadingAnalysis(false);
     }
   }, []);
 
+  // 2. Initial load: fetch cases & smart auto-select latest
   useEffect(() => {
-    if (activeCase?.id) {
-      void loadCaseAnalysis(activeCase.id);
-    } else {
-      setAnalysis(null);
-    }
-  }, [activeCase?.id, loadCaseAnalysis]);
+    let isMounted = true;
 
-  // Handlers from sidebar
-  const handleSelectCase = (c: CaseMeta) => {
-    setActiveCase(c);
+    const initApp = async () => {
+      setLoadingCases(true);
+      try {
+        const caseList = await api.getCases();
+        if (!isMounted) return;
+        setCases(caseList);
+
+        if (caseList.length > 0) {
+          const latestCase = caseList[0];
+          setActiveCase(latestCase);
+
+          // Check if latest case already has an analysis
+          const existingAnalysis = await loadCaseAnalysis(latestCase.id);
+          if (!isMounted) return;
+
+          if (existingAnalysis && existingAnalysis.hypotheses && existingAnalysis.hypotheses.length > 0) {
+            setActivePage('hypotheses');
+          } else {
+            setActivePage('ingest');
+          }
+        } else {
+          setActiveCase(null);
+          setActivePage('ingest');
+        }
+      } catch {
+        if (!isMounted) return;
+        setCases([]);
+        setActiveCase(null);
+      } finally {
+        if (isMounted) setLoadingCases(false);
+      }
+    };
+
+    void initApp();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [loadCaseAnalysis]);
+
+  // 3. Navigation handlers
+  const handleSelectCase = (caseMeta: CaseMeta) => {
+    setActiveCase(caseMeta);
+    setInitialChainKey(undefined);
+    setHighlightEvidenceId(undefined);
+    void (async () => {
+      const existing = await loadCaseAnalysis(caseMeta.id);
+      if (existing && existing.hypotheses && existing.hypotheses.length > 0) {
+        if (activePage === 'ingest') {
+          setActivePage('hypotheses');
+        }
+      } else {
+        setActivePage('ingest');
+      }
+    })();
+  };
+
+  const handleCaseCreated = (created: CaseMeta) => {
+    setCases((prev) => [created, ...prev]);
+    setActiveCase(created);
+    setAnalysis(null);
+    setInitialChainKey(undefined);
+    setHighlightEvidenceId(undefined);
+    setActivePage('ingest');
+  };
+
+  const handleCaseDeleted = (deletedCaseId: string) => {
+    setCases((prev) => prev.filter((c) => c.id !== deletedCaseId));
+    if (activeCase?.id === deletedCaseId) {
+      const remaining = cases.filter((c) => c.id !== deletedCaseId);
+      if (remaining.length > 0) {
+        const nextCase = remaining[0];
+        setActiveCase(nextCase);
+        void loadCaseAnalysis(nextCase.id);
+      } else {
+        setActiveCase(null);
+        setAnalysis(null);
+      }
+    }
   };
 
   const handleAnalyzeSuccess = (resp: AnalyzeCaseResponse) => {
     setAnalysis(resp);
-    setActiveTab('rca');
+    setActivePage('hypotheses');
+  };
+
+  const handlePurgeSuccess = () => {
+    if (activeCase?.id) {
+      void loadCaseAnalysis(activeCase.id);
+    }
+  };
+
+  // Welcome screen create case submission
+  const handleWelcomeCreateCase = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCaseTitle.trim()) return;
+
+    setCreatingCase(true);
+    setCreateCaseError(null);
+
+    try {
+      const payload: CreateCaseRequest = {
+        title: newCaseTitle.trim(),
+        description: newCaseDesc.trim(),
+      };
+      const created = await api.createCase(payload);
+      handleCaseCreated(created);
+      setNewCaseTitle('');
+      setNewCaseDesc('');
+      setShowCreateModal(false);
+    } catch (err: unknown) {
+      setCreateCaseError(err instanceof Error ? err.message : 'Ошибка при создании кейса');
+    } finally {
+      setCreatingCase(false);
+    }
   };
 
   return (
-    <div className="app-container">
-      {/* 1. Global Storage Header (15 GB budget bar, Purge Raw logs) */}
-      <StorageHeader />
+    <div className="v2-app-root">
+      {/* 1. Global Navigation Top Bar */}
+      <TopNavHeader
+        activeCase={activeCase}
+        activePage={activePage}
+        analysis={analysis}
+        onSelectPage={(page) => setActivePage(page)}
+        onSelectCase={handleSelectCase}
+        onCaseCreated={handleCaseCreated}
+        onCaseDeleted={handleCaseDeleted}
+        onAnalyzeSuccess={handleAnalyzeSuccess}
+        onPurgeSuccess={handlePurgeSuccess}
+      />
 
-      {/* 2. Main Layout: Sidebar + Central Workspace */}
-      <div className="app-body">
-        {/* Left Sidebar: Cases, Local Ingest, Tilt live capture, RCA Analyze button */}
-        <CaseSidebar
-          selectedCaseId={activeCase?.id}
-          onSelectCase={handleSelectCase}
-          onAnalyzeSuccess={handleAnalyzeSuccess}
-          onIngestComplete={() => {
-            if (activeCase?.id) {
-              void loadCaseAnalysis(activeCase.id);
-            }
-          }}
-        />
-
-        {/* Central Workspace */}
-        <main className="app-main">
-          {activeCase ? (
-            <div className="case-workspace">
-              {/* Case Title & Tabs Navigation Bar */}
-              <div className="case-header-bar">
-                <div className="case-meta-group">
-                  <div className="case-title-row">
-                    <h2>{activeCase.title}</h2>
-                    <span className="case-status-badge status-ready">{activeCase.status}</span>
-                  </div>
-                  {activeCase.description && (
-                    <p className="case-desc-text">{activeCase.description}</p>
-                  )}
-                  <div className="case-submeta text-xs text-muted">
-                    <span>ID: <code className="font-mono">{activeCase.id}</code></span>
-                    <span>Создан: {new Date(activeCase.created_at).toLocaleString()}</span>
-                    {analysis?.run_id && (
-                      <span>Последний анализ: <strong className="text-accent">{analysis.run_id}</strong></span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Tabs Switcher */}
-                <div className="tabs-bar">
-                  <button
-                    type="button"
-                    className={`tab-btn ${activeTab === 'rca' ? 'tab-btn-active' : ''}`}
-                    onClick={() => setActiveTab('rca')}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <line x1="18" y1="20" x2="18" y2="10" />
-                      <line x1="12" y1="20" x2="12" y2="4" />
-                      <line x1="6" y1="20" x2="6" y2="14" />
-                    </svg>
-                    RCA Hypotheses & Topology
-                  </button>
-
-                  <button
-                    type="button"
-                    className={`tab-btn ${activeTab === 'evidence' ? 'tab-btn-active' : ''}`}
-                    onClick={() => setActiveTab('evidence')}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <polyline points="14 2 14 8 20 8" />
-                      <line x1="16" y1="13" x2="8" y2="13" />
-                      <line x1="16" y1="17" x2="8" y2="17" />
-                    </svg>
-                    Evidence & Reports
-                    {analysis?.evidence_items && analysis.evidence_items.length > 0 && (
-                      <span className="tab-counter-badge">{analysis.evidence_items.length}</span>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    className={`tab-btn ${activeTab === 'explorer' ? 'tab-btn-active' : ''}`}
-                    onClick={() => setActiveTab('explorer')}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="11" cy="11" r="8" />
-                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                    </svg>
-                    Log Explorer
-                  </button>
-                </div>
-              </div>
-
-              {/* Tab Content */}
-              <div className="tab-content-area">
-                {activeTab === 'rca' && (
-                  <RcaDashboard
-                    caseId={activeCase.id}
-                    analysis={analysis}
-                    loading={loadingAnalysis}
-                    onRefresh={() => void loadCaseAnalysis(activeCase.id)}
-                  />
-                )}
-
-                {activeTab === 'evidence' && (
-                  <EvidenceAndGeminiPanel
-                    caseId={activeCase.id}
-                    runId={analysis?.run_id || 'latest'}
-                    evidenceItems={analysis?.evidence_items || []}
-                    loading={loadingAnalysis}
-                  />
-                )}
-
-                {activeTab === 'explorer' && (
-                  <div className="log-explorer-view">
-                    <div className="explorer-card">
-                      <div className="explorer-card-header">
-                        <h3>Инспектор логов и цепочек ClickHouse</h3>
-                        <span className="text-xs text-muted">
-                          Быстрый переход к контексту подов и поиск распределенных трасс
-                        </span>
-                      </div>
-
-                      <div className="explorer-controls-grid">
-                        <div className="explorer-field">
-                          <label className="text-xs">Фильтр по тексту / шаблону ошибки:</label>
-                          <input
-                            type="text"
-                            className="input-text"
-                            placeholder="Например: connection refused, 503, out of memory..."
-                            value={explorerQuery}
-                            onChange={(e) => setExplorerQuery(e.target.value)}
-                          />
-                        </div>
-
-                        <div className="explorer-field">
-                          <label className="text-xs">Сквозной ID (trace_id / request_id / session_id):</label>
-                          <div className="input-with-button">
-                            <input
-                              type="text"
-                              className="input-text"
-                              placeholder="c7a19e8b-..."
-                              value={explorerKey}
-                              onChange={(e) => setExplorerKey(e.target.value)}
-                            />
-                            <button
-                              type="button"
-                              className="btn btn-primary-sm"
-                              onClick={() => {
-                                setActiveTab('rca');
-                              }}
-                            >
-                              Искать цепочку
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {analysis?.hypotheses && analysis.hypotheses.length > 0 ? (
-                        <div className="explorer-quick-access">
-                          <span className="text-xs font-semibold text-muted">
-                            Быстрый просмотр контекста подов с инцидентами:
-                          </span>
-                          <div className="quick-pods-chips">
-                            {analysis.hypotheses.map((h) => (
-                              <button
-                                key={h.id}
-                                type="button"
-                                className="btn-chip"
-                                onClick={() => {
-                                  setActiveTab('rca');
-                                }}
-                              >
-                                {h.service} ({h.dominant_pod}): {h.error_class || h.template_text.slice(0, 30)}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="empty-hint p-4">
-                          Запустите анализ RCA для автоматического определения проблемных подов и формирования контекста.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="app-no-case-selected">
-              <div className="no-case-illustration">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      {/* 2. Main Multi-Page Full-Width Viewport */}
+      <main className="v2-app-main">
+        {loadingCases ? (
+          <div className="v2-loading-box">
+            <span className="spinner-icon">⟳</span> Загрузка окружения RCA Analyzer...
+          </div>
+        ) : !activeCase ? (
+          /* Welcome Screen when no cases exist */
+          <div className="v2-welcome-screen">
+            <div className="v2-welcome-card">
+              <div className="v2-welcome-icon-box">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
                   <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
                   <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
                 </svg>
               </div>
-              <h3>Кейс расследования не выбран</h3>
-              <p className="text-muted">
-                Создайте новый кейс или выберите существующий в левой боковой панели для импорта логов и анализа первопричин.
-              </p>
-            </div>
-          )}
 
-          {analysisError && (
-            <div className="global-error-toast">
-              <span>⚠ {analysisError}</span>
-              <button type="button" className="btn-close-sm" onClick={() => setAnalysisError(null)}>
+              <h2>Добро пожаловать в RCA Analyzer</h2>
+              <p className="v2-welcome-desc">
+                Интеллектуальная система локализации первопричин сбоев в микросервисах, сквозного поиска распределенных
+                цепочек и автоматической генерации доказательств для Google Gemini.
+              </p>
+
+              <div className="v2-welcome-features">
+                <div className="v2-welcome-feature-item">
+                  <span className="f-icon">📥</span>
+                  <div>
+                    <strong>Быстрый импорт и Tilt Live</strong>
+                    <p className="text-xs text-muted">Потоковый парсинг логов с контролем квоты диска 15 ГБ</p>
+                  </div>
+                </div>
+
+                <div className="v2-welcome-feature-item">
+                  <span className="f-icon">🎯</span>
+                  <div>
+                    <strong>Математический RCA-движок</strong>
+                    <p className="text-xs text-muted">Ранжирование гипотез, компенсация Clock Skew и фильтрация шума</p>
+                  </div>
+                </div>
+
+                <div className="v2-welcome-feature-item">
+                  <span className="f-icon">✨</span>
+                  <div>
+                    <strong>Пакет для Google Gemini</strong>
+                    <p className="text-xs text-muted">1-клик экспорт проверенных улик E-01..E-NN без PII</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="v2-welcome-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary v2-btn-welcome-create"
+                  onClick={() => setShowCreateModal(true)}
+                >
+                  + Создать первый кейс расследования
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Active Case: 5 Full-Width Pages */
+          <div className="v2-page-viewport">
+            {/* Page 1: Ingest & Tilt */}
+            {activePage === 'ingest' && (
+              <IngestAndTiltPage
+                activeCase={activeCase}
+                onIngestComplete={() => {
+                  if (activeCase?.id) {
+                    void loadCaseAnalysis(activeCase.id);
+                  }
+                }}
+                onAnalyzeSuccess={handleAnalyzeSuccess}
+                onNavigateToHypotheses={() => setActivePage('hypotheses')}
+              />
+            )}
+
+            {/* Page 2: Hypotheses */}
+            {activePage === 'hypotheses' && (
+              <HypothesesPage
+                caseId={activeCase.id}
+                analysis={analysis}
+                loading={loadingAnalysis}
+                onNavigateToTopology={() => setActivePage('topology')}
+                onNavigateToChains={(key) => {
+                  setInitialChainKey(key);
+                  setActivePage('chains');
+                }}
+                onNavigateToEvidence={(evId) => {
+                  setHighlightEvidenceId(evId);
+                  setActivePage('evidence');
+                }}
+              />
+            )}
+
+            {/* Page 3: Topology & Timeline */}
+            {activePage === 'topology' && (
+              <TopologyAndTimelinePage
+                caseId={activeCase.id}
+                analysis={analysis}
+                onSelectServiceForLogs={() => {
+                  setActivePage('chains');
+                }}
+              />
+            )}
+
+            {/* Page 4: Trace Chains & Logs Context */}
+            {activePage === 'chains' && (
+              <ChainAndContextPage
+                caseId={activeCase.id}
+                analysis={analysis}
+                initialChainKey={initialChainKey}
+              />
+            )}
+
+            {/* Page 5: Evidence & Gemini Reports */}
+            {activePage === 'evidence' && (
+              <EvidenceAndGeminiPanel
+                caseId={activeCase.id}
+                runId={analysis?.run_id || 'latest'}
+                evidenceItems={analysis?.evidence_items || []}
+                highlightEvidenceId={highlightEvidenceId}
+                loading={loadingAnalysis}
+              />
+            )}
+          </div>
+        )}
+      </main>
+
+      {/* --- Modal: Create Case (from Welcome Screen) --- */}
+      {showCreateModal && (
+        <div className="modal-backdrop" onClick={() => setShowCreateModal(false)}>
+          <div className="modal-content v2-create-case-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Создать новый кейс расследования</h3>
+              <button
+                type="button"
+                className="btn-close-sm"
+                onClick={() => setShowCreateModal(false)}
+              >
                 ✕
               </button>
             </div>
-          )}
-        </main>
-      </div>
+
+            <form onSubmit={(e) => void handleWelcomeCreateCase(e)}>
+              {createCaseError && <div className="sidebar-error-toast mb-3">{createCaseError}</div>}
+
+              <div className="form-group mb-3">
+                <label className="text-xs font-semibold">Название инцидента / кейса *:</label>
+                <input
+                  type="text"
+                  className="input-text"
+                  placeholder="Например: Сбой каскада заказов 30 октября"
+                  value={newCaseTitle}
+                  onChange={(e) => setNewCaseTitle(e.target.value)}
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <div className="form-group mb-4">
+                <label className="text-xs font-semibold">Описание (контекст, симптомы):</label>
+                <textarea
+                  className="input-textarea"
+                  rows={3}
+                  placeholder="Опишите наблюдаемые аномалии, затронутые сервисы или ссылки на алерты..."
+                  value={newCaseDesc}
+                  onChange={(e) => setNewCaseDesc(e.target.value)}
+                />
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowCreateModal(false)}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={creatingCase || !newCaseTitle.trim()}
+                >
+                  {creatingCase ? 'Создание...' : 'Создать кейс'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default App;
+
