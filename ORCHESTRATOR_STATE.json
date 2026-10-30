@@ -5,8 +5,8 @@
   "min_test_coverage_percent": 80,
   "target_model": "gemini-3.8-flash-high",
   "subagent_model_mode": "inherit",
-  "current_task_id": "TASK-24",
-  "current_task_file": "./tasks/TASK-24-frontend-v2-navigation-modals-and-ingest-page.md",
+  "current_task_id": "TASK-25",
+  "current_task_file": "./tasks/TASK-25-frontend-v2-hypotheses-drawer-and-topology-page.md",
   "current_phase": "IDLE",
   "attempt_in_current_task": 0,
   "max_attempts_per_task": 3,
@@ -35,14 +35,21 @@
     "TASK-20",
     "TASK-21",
     "TASK-22",
-    "TASK-23"
+    "TASK-23",
+    "TASK-24"
   ],
   "pending_tasks_ordered": [
-    "TASK-24",
     "TASK-25",
     "TASK-26"
   ],
-  "last_checkpoint_utc": "2026-10-29T21:25:00Z",
-  "last_checkpoint_note": "Frontend UI v2 Redesign tasks (TASK-24..TASK-26) added and ready to execute from TASK-24.",
-  "history": []
+  "last_checkpoint_utc": "2026-10-30T09:27:00Z",
+  "last_checkpoint_note": "TASK-24 approved and completed. Ready for TASK-25.",
+  "history": [
+    {
+      "task_id": "TASK-24",
+      "status": "APPROVED",
+      "timestamp": "2026-10-30T09:26:36Z",
+      "note": "TopNavHeader, IngestAndTiltPage, navigation.ts, styles.css verified and approved."
+    }
+  ]
 }
