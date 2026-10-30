@@ -328,6 +328,7 @@ TASK_SPECS = {
     "TASK-27": {
         "files": [
             "services/frontend-ui/src/utils/humanRcaTranslator.ts",
+            "services/frontend-ui/src/components/HelpTooltip.tsx",
             "services/frontend-ui/src/components/SimpleRcaOverviewPage.tsx",
             "services/frontend-ui/src/styles.css",
         ],
