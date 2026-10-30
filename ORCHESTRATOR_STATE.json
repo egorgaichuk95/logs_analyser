@@ -58,6 +58,12 @@
       "status": "APPROVED",
       "timestamp": "2026-10-30T09:47:28Z",
       "note": "HypothesesPage, TopologyAndTimelinePage, styles.css verified and approved."
+    },
+    {
+      "task_id": "TASK-26",
+      "status": "APPROVED",
+      "timestamp": "2026-10-30T11:04:45Z",
+      "note": "ChainAndContextPage, EvidenceAndGeminiPanel, App.tsx, styles.css built, verified and passed E2E."
     }
   ]
 }
