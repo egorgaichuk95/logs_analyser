@@ -1,6 +1,6 @@
 # TASK-27: Интуитивный русскоязычный интерфейс (Часть 1) — Переводчик терминов на человеческий русский язык, наглядная дорожка «Причина → Последствия» и богатая многоцветная палитра UI (`./services/frontend-ui`)
 
-- **Статус:** `TODO`
+- **Статус:** `IN_REVIEW`
 - **Зависимости:** `TASK-26`
 - **Область видимости (Scope):**
   - Читать: `./services/frontend-ui/src/api/client.ts`, `./services/frontend-ui/src/types/navigation.ts`, `./services/frontend-ui/src/styles.css`
@@ -165,15 +165,34 @@ py ./verify_task.py TASK-27
 
 ## Отчёт о выполнении (заполняется субагентом-воркером)
 
-- **Дата выполнения:** *(не заполнено)*
-- **Созданные/изменённые файлы:** *(не заполнено)*
-- **Результаты проверок и тестов:** *(не заполнено)*
-- **Заметки по реализации:** *(не заполнено)*
+- **Дата выполнения:** 2026-10-30 14:40
+- **Созданные/изменённые файлы:**
+  - `services/frontend-ui/src/utils/humanRcaTranslator.ts` (263 строки): 100% реализация переводчика на русский язык (`getRoleRussianLabel`, `getRoleShortRussianLabel`, `getErrorClassRussianLabel`, `getSignalRussianInfo` для S1..S8, `buildHumanRussianExplanation`, `estimateHypothesisProblemLogsCount`, `getServiceColor` с 8 богатыми оттенками, `calculateIncidentDurationMinutes`, `computeLagSecondsFromRoot`, `getBestCorrelationWithRoot`).
+  - `services/frontend-ui/src/components/HelpTooltip.tsx` (84 строки): компактный компонент справки `?` ровно 15px x 15px с popover (310px), подсветкой при наведении, цветной верхней полоской, заголовком, описанием и блоком «Как использовать».
+  - `services/frontend-ui/src/components/SimpleRcaOverviewPage.tsx` (768 строк): полноценная страница понятного разбора аварии на русском языке с Hero-карточкой («Главный вывод: в чём причина аварии и что делать», где начался сбой, последствия с задержками, масштаб проблемы и отсеянный шум, быстрые цветные кнопки действий, включая просмотр контекстных логов ±20 строк через `api.getContextLogs`), 3-шаговой визуальной дорожкой со стрелками (Шаг 1: Первопричина, Шаг 2: Каскадные последствия, Шаг 3: Внешние симптомы у клиентов, свёрнутый блок отсеянного фонового шума), кнопкой раскрытия 8 технических сигналов S1..S8 и размещением `<HelpTooltip />` на всех блоках и метриках.
+  - `services/frontend-ui/src/styles.css`: добавлены цветовые переменные (`--color-ruby`, `--color-amber`, `--color-gold`, `--color-emerald`, `--color-violet`, `--color-cyan`, `--color-rose`, `--color-lime`), стили HelpTooltip (ровно 15x15px, поповеры, акценты), визуальной дорожки, разделителей-стрелок, бейджей задержек и модального окна логов.
+- **Результаты проверок и тестов:**
+  - `docker run --rm -v "${PWD}/services/frontend-ui:/app" -v rca_npm_cache:/root/.npm -w /app node:22-alpine sh -c "npx tsc --noEmit"` — `PASS` (0 ошибок TypeScript).
+  - `docker run --rm -v "${PWD}/services/frontend-ui:/app" -v rca_npm_cache:/root/.npm -w /app node:22-alpine sh -c "npm run build"` — `PASS` (успешная сборка Vite в production).
+  - `py ./verify_task.py TASK-27` — `[VERIFY PASSED] TASK-27 passed all automated checks!`
+  - Отсутствие `// TODO`, `// FIXME` или заглушек — проверено и подтверждено.
+- **Заметки по реализации:**
+  - Для вычисления опережения и корреляций реализованы алгоритмы, проверяющие `lead_lag_peers`, временные метки `onset_time` и сигналы `lead_lag_score`, обеспечивающие точные задержки `+N сек` и проценты корреляции.
+  - Палитра микросервисов содержит детерминированный строковый хеш для любых неизвестных названий сервисов с фиксированными слотами для стандартных сервисов архитектуры.
+  - Модальное окно просмотра логов позволяет фильтровать логи по уровню (ERROR, WARN, INFO), искать по тексту и копировать строки в буфер обмена.
 
 ---
 
 ## Вердикт ревьюера (заполняется субагентом-ревьюером)
 
-- **Статус ревью:** `PENDING` *(выбрать: `APPROVED` | `CHANGES_REQUESTED`)*
-- **Проверенные контракты и тесты:** *(не заполнено)*
-- **Найденные замечания (если есть):** *(не заполнено)*
+- **Статус ревью:** `APPROVED`
+- **Проверенные контракты и тесты:**
+  - `services/frontend-ui/src/utils/humanRcaTranslator.ts`: Полная посимвольная проверка всех экспортируемых функций (`getRoleRussianLabel`, `getRoleShortRussianLabel`, `getErrorClassRussianLabel`, `getSignalRussianInfo`, `buildHumanRussianExplanation`, `estimateHypothesisProblemLogsCount`, `getServiceColor`, `calculateIncidentDurationMinutes`, `computeLagSecondsFromRoot`, `getBestCorrelationWithRoot`) и интерфейса `ServiceColorTheme`. Все контракты строго соблюдены.
+  - `services/frontend-ui/src/components/HelpTooltip.tsx`: Проверен контракт `HelpTooltipProps` и реализация компонента `HelpTooltip`. Размер триггера `?` строго зафиксирован как ровно `15px × 15px` (`.help-tooltip-trigger`), попап всплывает мгновенно, снабжён заголовком, описанием и блоком «Как использовать».
+  - `services/frontend-ui/src/components/SimpleRcaOverviewPage.tsx`: Проверен контракт `SimpleRcaOverviewPageProps` и реализация Hero-карточки («Главный вывод»), 3-шаговой цепочки развития аварии (Шаг 1: Первопричина `#f43f5e`, Шаг 2: Каскадные последствия `#f59e0b`, Шаг 3: Внешние симптомы `#eab308`), свёрнутого блока отсеянного шума (`#10b981`), раскрытия 8 технических сигналов S1..S8, и модального окна просмотра контекстных логов (±20 строк вокруг сбоя). Компоненты `<HelpTooltip />` размещены на всех ключевых блоках и метриках.
+  - `services/frontend-ui/src/styles.css`: Проверена богатая цветовая палитра (`--color-ruby`, `--color-amber`, `--color-gold`, `--color-emerald`, `--color-violet`, `--color-cyan`, `--color-rose`, `--color-lime`), стили триггера `15px × 15px`, всплывающих подсказок и разделителей-стрелок дорожки аварии.
+  - **Личный прогон верификации:**
+    - `py ./verify_task.py TASK-27` — `[VERIFY PASSED] TASK-27 passed all automated checks!` (код возврата `0`).
+    - `docker run --rm -v "${PWD}/services/frontend-ui:/app" -v rca_npm_cache:/root/.npm -w /app node:22-alpine sh -c "npx tsc --noEmit"` — `PASS` (0 ошибок компиляции TypeScript, код возврата `0`).
+  - Полное отсутствие `TODO`, `FIXME` и заглушек. Защита от `NaN`/`Inf` и деления на 0 во всех математических вспомогательных функциях. Чужие файлы и сервисы не затронуты.
+- **Найденные замечания:** Нет. Реализация полностью соответствует спецификации TASK-27 и чек-листу REVIEWER_GUIDE.

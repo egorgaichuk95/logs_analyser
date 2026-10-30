@@ -5,8 +5,8 @@
   "min_test_coverage_percent": 80,
   "target_model": "gemini-3.8-flash-high",
   "subagent_model_mode": "inherit",
-  "current_task_id": "TASK-27",
-  "current_task_file": "./tasks/TASK-27-intuitive-russian-rca-story-and-colorful-theme.md",
+  "current_task_id": "TASK-28",
+  "current_task_file": "./tasks/TASK-28-time-correlations-classic-mode-switcher-and-build.md",
   "current_phase": "IDLE",
   "attempt_in_current_task": 0,
   "max_attempts_per_task": 3,
@@ -38,14 +38,14 @@
     "TASK-23",
     "TASK-24",
     "TASK-25",
-    "TASK-26"
+    "TASK-26",
+    "TASK-27"
   ],
   "pending_tasks_ordered": [
-    "TASK-27",
     "TASK-28"
   ],
-  "last_checkpoint_utc": "2026-10-30T14:08:00Z",
-  "last_checkpoint_note": "TASK-26 completed. Added TASK-27 and TASK-28 for Intuitive Russian UI, Problem Logs & Correlation Panel, Colorful Palette, and Classic/Engineering Mode switcher.",
+  "last_checkpoint_utc": "2026-10-30T14:46:40Z",
+  "last_checkpoint_note": "TASK-27 completed and approved. Ready for TASK-28.",
   "history": [
     {
       "task_id": "TASK-24",
@@ -64,6 +64,12 @@
       "status": "APPROVED",
       "timestamp": "2026-10-30T11:04:45Z",
       "note": "ChainAndContextPage, EvidenceAndGeminiPanel, App.tsx, styles.css built, verified and passed E2E."
+    },
+    {
+      "task_id": "TASK-27",
+      "status": "APPROVED",
+      "timestamp": "2026-10-30T14:46:40Z",
+      "note": "humanRcaTranslator, HelpTooltip 15x15, SimpleRcaOverviewPage, 8-color palette verified and approved."
     }
   ]
 }
