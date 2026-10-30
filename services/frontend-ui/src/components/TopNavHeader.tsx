@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   api,
   CaseMeta,
@@ -8,8 +8,34 @@ import {
   CreateCaseRequest,
 } from '../api/client';
 import { TopNavHeaderProps } from '../types/navigation';
+import { HelpTooltip } from './HelpTooltip';
 
 export const DISK_QUOTA_BYTES = 15 * 1024 * 1024 * 1024; // 15 GB
+
+export function translateCaseStatus(status?: string): string {
+  if (!status) return 'Неизвестно';
+  const s = status.toUpperCase();
+  switch (s) {
+    case 'RAW_PURGED':
+      return 'Сырые логи очищены';
+    case 'READY':
+      return 'Готов';
+    case 'ANALYZED':
+      return 'Проанализирован';
+    case 'CREATED':
+      return 'Создан';
+    case 'PENDING':
+      return 'В ожидании';
+    case 'INGESTING':
+      return 'Загрузка логов';
+    case 'ANALYZING':
+      return 'Анализ';
+    case 'ERROR':
+      return 'Ошибка';
+    default:
+      return status;
+  }
+}
 
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
@@ -66,6 +92,28 @@ export const TopNavHeader: React.FC<TopNavHeaderProps> = ({
   const [incidentStart, setIncidentStart] = useState<string>('');
   const [incidentEnd, setIncidentEnd] = useState<string>('');
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+
+  // Tools Dropdown Menu state
+  const [showToolsMenu, setShowToolsMenu] = useState<boolean>(false);
+  const toolsMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showToolsMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (toolsMenuRef.current && !toolsMenuRef.current.contains(e.target as Node)) {
+        setShowToolsMenu(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowToolsMenu(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showToolsMenu]);
 
   // 1. Fetch storage status
   const fetchStorageStatus = useCallback(async () => {
@@ -248,16 +296,32 @@ export const TopNavHeader: React.FC<TopNavHeaderProps> = ({
               </div>
               {activeCase && (
                 <span className={`v2-status-pill status-${activeCase.status.toLowerCase()}`}>
-                  {activeCase.status}
+                  {translateCaseStatus(activeCase.status)}
                 </span>
               )}
               <span className="v2-case-picker-action">Сменить ▾</span>
             </button>
+            <HelpTooltip
+              title="Кейсы расследования"
+              description="Изолированные инциденты для анализа. Каждый кейс содержит свои наборы файлов логов, топологию и отчёты."
+              howToUse="Нажмите «Сменить ▾», чтобы создать новый кейс или переключиться между сохранёнными инцидентами."
+              accentColor="cyan"
+              position="bottom"
+            />
           </div>
         </div>
 
-        {/* Center: 5 Page Tabs */}
+        {/* Center: Main Russian Menu Tabs */}
         <nav className="v2-nav-tabs">
+          <button
+            type="button"
+            className={`v2-nav-tab ${activePage === 'overview' ? 'active' : ''}`}
+            onClick={() => onSelectPage('overview')}
+          >
+            <span className="v2-tab-icon">✨</span>
+            <span className="v2-tab-label">Понятный разбор аварии</span>
+          </button>
+
           <button
             type="button"
             className={`v2-nav-tab ${activePage === 'ingest' ? 'active' : ''}`}
@@ -269,32 +333,11 @@ export const TopNavHeader: React.FC<TopNavHeaderProps> = ({
 
           <button
             type="button"
-            className={`v2-nav-tab ${activePage === 'hypotheses' ? 'active' : ''}`}
-            onClick={() => onSelectPage('hypotheses')}
-          >
-            <span className="v2-tab-icon">🎯</span>
-            <span className="v2-tab-label">Гипотезы RCA</span>
-            {hypothesesCount > 0 && (
-              <span className="v2-tab-badge badge-primary">{hypothesesCount}</span>
-            )}
-          </button>
-
-          <button
-            type="button"
             className={`v2-nav-tab ${activePage === 'topology' ? 'active' : ''}`}
             onClick={() => onSelectPage('topology')}
           >
             <span className="v2-tab-icon">🕸️</span>
-            <span className="v2-tab-label">Граф и Таймлайн</span>
-          </button>
-
-          <button
-            type="button"
-            className={`v2-nav-tab ${activePage === 'chains' ? 'active' : ''}`}
-            onClick={() => onSelectPage('chains')}
-          >
-            <span className="v2-tab-icon">🔍</span>
-            <span className="v2-tab-label">Цепочки и Логи</span>
+            <span className="v2-tab-label">Граф связей и Таймлайн</span>
           </button>
 
           <button
@@ -303,37 +346,155 @@ export const TopNavHeader: React.FC<TopNavHeaderProps> = ({
             onClick={() => onSelectPage('evidence')}
           >
             <span className="v2-tab-icon">📑</span>
-            <span className="v2-tab-label">Улики и Gemini</span>
+            <span className="v2-tab-label">Доказательства и Отчёт для ИИ</span>
             {evidenceCount > 0 && (
               <span className="v2-tab-badge badge-evidence">{evidenceCount}</span>
             )}
           </button>
         </nav>
 
-        {/* Right Side: RCA Trigger + Compact Quota Indicator */}
+        {/* Right Side: Professional Tools Menu + RCA Trigger + Compact Quota Indicator */}
         <div className="v2-top-nav-right">
-          <button
-            type="button"
-            className="v2-btn-analyze-quick"
-            disabled={!activeCase || analyzing}
-            onClick={() => setShowAnalyzeModal(true)}
-            title={activeCase ? 'Открыть параметры запуска анализа RCA' : 'Выберите кейс для анализа'}
-          >
-            <span className="v2-analyze-icon">🚀</span>
-            <span>Запустить RCA</span>
-          </button>
+          {/* Menu: Профессиональные / Старые инструменты */}
+          <div className="v2-tools-menu-wrapper" ref={toolsMenuRef}>
+            <div className="v2-tools-menu-btn-group">
+              <button
+                type="button"
+                className={`v2-btn-tools-dropdown ${
+                  activePage === 'hypotheses' ||
+                  activePage === 'chains' ||
+                  activePage === 'classic_v1'
+                    ? 'is-active'
+                    : ''
+                }`}
+                onClick={() => setShowToolsMenu((prev) => !prev)}
+                aria-expanded={showToolsMenu}
+                title="Открыть меню профессиональных и инженерных инструментов"
+              >
+                <span className="v2-tools-icon">⚙️</span>
+                <span className="v2-tools-label">Профессиональные инструменты</span>
+                <span className="v2-tools-caret">{showToolsMenu ? '▲' : '▾'}</span>
+              </button>
+              <HelpTooltip
+                title="Профессиональные / Старые инструменты"
+                description="Доступ ко всем детальным инженерным экранам без сокращений: таблица гипотез с 8 математическими сигналами (S1..S8), глубокая трассировка цепочек и классический интерфейс v1 (все панели на 1 экране)."
+                howToUse="Нажмите на кнопку, чтобы выбрать специализированный режим работы."
+                accentColor="violet"
+                position="bottom"
+              />
+            </div>
 
-          <button
-            type="button"
-            className="v2-disk-indicator-btn"
-            onClick={() => setShowQuotaModal(true)}
-            title="Открыть детальное управление дисковой квотой 15 ГБ"
-          >
-            <span className="v2-disk-dot" style={{ backgroundColor: diskStatusColor }} />
-            <span className="v2-disk-text">
-              💾 {formatBytes(totalUsed)} / {formatBytes(quota)}
-            </span>
-          </button>
+            {showToolsMenu && (
+              <div className="v2-tools-dropdown-menu">
+                <div className="v2-tools-dropdown-header">
+                  Инженерные инструменты расследования
+                </div>
+
+                <button
+                  type="button"
+                  className={`v2-tools-dropdown-item ${activePage === 'hypotheses' ? 'is-current' : ''}`}
+                  onClick={() => {
+                    onSelectPage('hypotheses');
+                    setShowToolsMenu(false);
+                  }}
+                >
+                  <span className="item-icon">🔬</span>
+                  <div className="item-content">
+                    <span className="item-title">
+                      Детальная таблица гипотез и 8 сигналов (S1..S8)
+                    </span>
+                    <span className="item-desc">
+                      Полный математический скоринг по всем метрикам
+                    </span>
+                  </div>
+                  {hypothesesCount > 0 && (
+                    <span className="v2-tab-badge badge-primary">{hypothesesCount}</span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  className={`v2-tools-dropdown-item ${activePage === 'chains' ? 'is-current' : ''}`}
+                  onClick={() => {
+                    onSelectPage('chains');
+                    setShowToolsMenu(false);
+                  }}
+                >
+                  <span className="item-icon">🔍</span>
+                  <div className="item-content">
+                    <span className="item-title">
+                      Трассировка цепочек и Терминал логов
+                    </span>
+                    <span className="item-desc">
+                      Сквозные Trace ID, Span ID и терминал строк
+                    </span>
+                  </div>
+                </button>
+
+                <div className="v2-tools-dropdown-divider" />
+
+                <button
+                  type="button"
+                  className={`v2-tools-dropdown-item ${activePage === 'classic_v1' ? 'is-current' : ''}`}
+                  onClick={() => {
+                    onSelectPage('classic_v1');
+                    setShowToolsMenu(false);
+                  }}
+                >
+                  <span className="item-icon">🏛️</span>
+                  <div className="item-content">
+                    <span className="item-title">
+                      Классический вид v1 (Все панели на 1 экране)
+                    </span>
+                    <span className="item-desc">
+                      Оригинальный интерфейс с боковой панелью кейсов
+                    </span>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="v2-action-group">
+            <button
+              type="button"
+              className="v2-btn-analyze-quick"
+              disabled={!activeCase || analyzing}
+              onClick={() => setShowAnalyzeModal(true)}
+              title={activeCase ? 'Открыть параметры запуска анализа RCA' : 'Выберите кейс для анализа'}
+            >
+              <span className="v2-analyze-icon">🚀</span>
+              <span>Запустить RCA</span>
+            </button>
+            <HelpTooltip
+              title="Запуск RCA расследования"
+              description="Выполняет 8-факторный статистический анализ, выявляет первопричину, лаги времени и строит цепочки распространения сбоя."
+              howToUse="Нажмите для настройки параметров окна инцидента и запуска расчёта."
+              accentColor="ruby"
+              position="bottom"
+            />
+          </div>
+
+          <div className="v2-action-group">
+            <button
+              type="button"
+              className="v2-disk-indicator-btn"
+              onClick={() => setShowQuotaModal(true)}
+              title="Открыть детальное управление дисковой квотой 15 ГБ"
+            >
+              <span className="v2-disk-dot" style={{ backgroundColor: diskStatusColor }} />
+              <span className="v2-disk-text">
+                💾 {formatBytes(totalUsed)} / {formatBytes(quota)}
+              </span>
+            </button>
+            <HelpTooltip
+              title="Дисковая квота 15 ГБ"
+              description="Показывает текущее использование памяти в ClickHouse по слоям: сырые логи, шаблоны Drain, агрегаты и отчёты."
+              howToUse="Нажмите, чтобы открыть управление хранилищем и при необходимости безопасно очистить сырые логи."
+              accentColor="amber"
+              position="bottom"
+            />
+          </div>
         </div>
       </header>
 
@@ -442,7 +603,7 @@ export const TopNavHeader: React.FC<TopNavHeaderProps> = ({
                             {c.title}
                           </span>
                           <span className={`v2-status-pill status-${c.status.toLowerCase()}`}>
-                            {c.status}
+                            {translateCaseStatus(c.status)}
                           </span>
                         </div>
 

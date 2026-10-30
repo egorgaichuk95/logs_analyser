@@ -6,6 +6,7 @@ import {
   NormalizedEvent,
 } from '../api/client';
 import { HelpTooltip } from './HelpTooltip';
+import { ProblemLogsAndCorrelationPanel } from './ProblemLogsAndCorrelationPanel';
 import {
   getRoleRussianLabel,
   getRoleShortRussianLabel,
@@ -393,6 +394,17 @@ export const SimpleRcaOverviewPage: React.FC<SimpleRcaOverviewPageProps> = ({
             }}
           >
             ⬇️ Посмотреть цепочку развития аварии
+          </button>
+
+          <button
+            type="button"
+            className="btn simple-btn-scroll"
+            onClick={() => {
+              const el = document.getElementById('problem-logs-correlation-section');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }}
+          >
+            📊 Перейти к графику количества ошибок и корреляциям ↓
           </button>
         </div>
       </section>
@@ -993,8 +1005,20 @@ export const SimpleRcaOverviewPage: React.FC<SimpleRcaOverviewPageProps> = ({
       </section>
 
       {/* =========================================================================
-          МОДАЛЬНОЕ ОКНО: Просмотр логов в момент аварии (±20 строк)
+          БЛОК В. ИНТЕРАКТИВНАЯ ПАНЕЛЬ: Количество проблемных логов и Корреляции
          ========================================================================= */}
+      <section id="problem-logs-correlation-section" className="simple-correlation-section">
+        <ProblemLogsAndCorrelationPanel
+          analysis={analysis}
+          onSelectServiceLogs={(pod, onsetTime) => {
+            const matching =
+              hypotheses.find((h) => h.dominant_pod === pod || h.service === pod) || primaryRoot;
+            if (matching) {
+              void openLogsModal({ ...matching, dominant_pod: pod, onset_time: onsetTime });
+            }
+          }}
+        />
+      </section>
       {modalOpen && (
         <div
           className="simple-logs-modal-overlay"

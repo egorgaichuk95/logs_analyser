@@ -2,11 +2,16 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { api, CaseMeta, AnalyzeCaseResponse, CreateCaseRequest } from './api/client';
 import { AppPageId } from './types/navigation';
 import { TopNavHeader } from './components/TopNavHeader';
+import { SimpleRcaOverviewPage } from './components/SimpleRcaOverviewPage';
 import { IngestAndTiltPage } from './components/IngestAndTiltPage';
 import { HypothesesPage } from './components/HypothesesPage';
 import { TopologyAndTimelinePage } from './components/TopologyAndTimelinePage';
 import { ChainAndContextPage } from './components/ChainAndContextPage';
 import { EvidenceAndGeminiPanel } from './components/EvidenceAndGeminiPanel';
+import { StorageHeader } from './components/StorageHeader';
+import { CaseSidebar } from './components/CaseSidebar';
+import { RcaDashboard } from './components/RcaDashboard';
+import { HelpTooltip } from './components/HelpTooltip';
 
 export const App: React.FC = () => {
   // Cases state
@@ -18,8 +23,8 @@ export const App: React.FC = () => {
   const [analysis, setAnalysis] = useState<AnalyzeCaseResponse | null>(null);
   const [loadingAnalysis, setLoadingAnalysis] = useState<boolean>(false);
 
-  // Active page state: 'ingest' | 'hypotheses' | 'topology' | 'chains' | 'evidence'
-  const [activePage, setActivePage] = useState<AppPageId>('ingest');
+  // Active page state: 'overview' | 'ingest' | 'hypotheses' | 'topology' | 'chains' | 'evidence' | 'classic_v1'
+  const [activePage, setActivePage] = useState<AppPageId>('overview');
 
   // Deep-link state across pages
   const [initialChainKey, setInitialChainKey] = useState<string | undefined>(undefined);
@@ -67,7 +72,7 @@ export const App: React.FC = () => {
           if (!isMounted) return;
 
           if (existingAnalysis && existingAnalysis.hypotheses && existingAnalysis.hypotheses.length > 0) {
-            setActivePage('hypotheses');
+            setActivePage('overview');
           } else {
             setActivePage('ingest');
           }
@@ -100,7 +105,7 @@ export const App: React.FC = () => {
       const existing = await loadCaseAnalysis(caseMeta.id);
       if (existing && existing.hypotheses && existing.hypotheses.length > 0) {
         if (activePage === 'ingest') {
-          setActivePage('hypotheses');
+          setActivePage('overview');
         }
       } else {
         setActivePage('ingest');
@@ -134,7 +139,7 @@ export const App: React.FC = () => {
 
   const handleAnalyzeSuccess = (resp: AnalyzeCaseResponse) => {
     setAnalysis(resp);
-    setActivePage('hypotheses');
+    setActivePage('overview');
   };
 
   const handlePurgeSuccess = () => {
@@ -200,7 +205,15 @@ export const App: React.FC = () => {
                 </svg>
               </div>
 
-              <h2>Добро пожаловать в RCA Analyzer</h2>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                <h2>Добро пожаловать в RCA Analyzer</h2>
+                <HelpTooltip
+                  title="О системе RCA Analyzer"
+                  description="Интеллектуальная система локализации первопричин сбоев в микросервисах, сквозного поиска распределенных цепочек и автоматической генерации доказательств для Google Gemini."
+                  howToUse="Создайте свой первый кейс расследования или загрузите логи для автоматического анализа."
+                  accentColor="cyan"
+                />
+              </div>
               <p className="v2-welcome-desc">
                 Интеллектуальная система локализации первопричин сбоев в микросервисах, сквозного поиска распределенных
                 цепочек и автоматической генерации доказательств для Google Gemini.
@@ -244,8 +257,21 @@ export const App: React.FC = () => {
             </div>
           </div>
         ) : (
-          /* Active Case: 5 Full-Width Pages */
+          /* Active Case: 7 Pages */
           <div className="v2-page-viewport">
+            {/* Page 0: Overview (✨ Понятный разбор аварии) */}
+            {activePage === 'overview' && (
+              <SimpleRcaOverviewPage
+                caseId={activeCase.id}
+                analysis={analysis}
+                loading={loadingAnalysis}
+                onOpenGeminiModal={() => setActivePage('evidence')}
+                onSwitchToEngineeringMode={(target) =>
+                  setActivePage(target || 'hypotheses')
+                }
+              />
+            )}
+
             {/* Page 1: Ingest & Tilt */}
             {activePage === 'ingest' && (
               <IngestAndTiltPage
@@ -256,7 +282,7 @@ export const App: React.FC = () => {
                   }
                 }}
                 onAnalyzeSuccess={handleAnalyzeSuccess}
-                onNavigateToHypotheses={() => setActivePage('hypotheses')}
+                onNavigateToHypotheses={() => setActivePage('overview')}
               />
             )}
 
@@ -307,6 +333,55 @@ export const App: React.FC = () => {
                 highlightEvidenceId={highlightEvidenceId}
                 loading={loadingAnalysis}
               />
+            )}
+
+            {/* Page 6: Classic v1 Layout (All Panels on 1 Screen) */}
+            {activePage === 'classic_v1' && (
+              <div className="v1-classic-root">
+                <div className="v1-classic-banner">
+                  <span className="v1-classic-tag">🏛️ Классический режим v1</span>
+                  <span className="v1-classic-desc">Все панели инструментов на одном экране</span>
+                  <HelpTooltip
+                    title="Классический режим v1"
+                    description="Оригинальный интерфейс, где хранилище, сайдбар кейсов, детальный дэшборд гипотез и панель улик открыты одновременно."
+                    howToUse="Используйте этот режим, если вам привычнее работать в компактном одноэкранном виде."
+                    accentColor="violet"
+                  />
+                </div>
+                <StorageHeader
+                  onRefresh={() => {
+                    if (activeCase?.id) void loadCaseAnalysis(activeCase.id);
+                  }}
+                  onPurgeSuccess={handlePurgeSuccess}
+                />
+                <div className="app-body">
+                  <CaseSidebar
+                    selectedCaseId={activeCase.id}
+                    onSelectCase={handleSelectCase}
+                    onAnalyzeSuccess={handleAnalyzeSuccess}
+                    onIngestComplete={() => {
+                      if (activeCase?.id) void loadCaseAnalysis(activeCase.id);
+                    }}
+                  />
+                  <div className="main-content">
+                    <RcaDashboard
+                      caseId={activeCase.id}
+                      analysis={analysis}
+                      loading={loadingAnalysis}
+                      onRefresh={() => {
+                        if (activeCase?.id) void loadCaseAnalysis(activeCase.id);
+                      }}
+                    />
+                    <EvidenceAndGeminiPanel
+                      caseId={activeCase.id}
+                      runId={analysis?.run_id || 'latest'}
+                      evidenceItems={analysis?.evidence_items || []}
+                      highlightEvidenceId={highlightEvidenceId}
+                      loading={loadingAnalysis}
+                    />
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         )}

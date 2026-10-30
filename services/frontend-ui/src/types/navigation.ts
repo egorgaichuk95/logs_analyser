@@ -1,6 +1,13 @@
 import { CaseMeta, AnalyzeCaseResponse } from '../api/client';
 
-export type AppPageId = 'ingest' | 'hypotheses' | 'topology' | 'chains' | 'evidence';
+export type AppPageId =
+  | 'overview'
+  | 'ingest'
+  | 'hypotheses'
+  | 'topology'
+  | 'chains'
+  | 'evidence'
+  | 'classic_v1';
 
 export interface TopNavHeaderProps {
   activeCase: CaseMeta | null;
